@@ -224,6 +224,9 @@
       <label>Отложить напоминание на:</label>
       <div class="snooze-grid" id="snooze-grid"></div>
     </div>
+    <div id="ios-sound-btn" style="display:none;margin-bottom:12px">
+      <button class="btn" style="background:#e24b4a;color:#fff;border-color:#e24b4a;width:100%;font-size:15px" onclick="iosTapPlay()">🔊 Нажмите чтобы включить звук</button>
+    </div>
     <div class="abtns">
       <button class="btn btn-primary" onclick="doSnooze()">Отложить</button>
       <button class="btn" onclick="dismissCurrent()">Закрыть</button>
@@ -672,6 +675,16 @@ function pickSnooze(mins,btn){
   btn.classList.add('picked');
 }
 
+function iosTapPlay(){
+  // iOS требует воспроизведения в обработчике пользовательского жеста
+  document.getElementById('ios-sound-btn').style.display='none';
+  if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume();
+  if(currentAlarmId!==null){
+    const r=reminders.find(x=>x.id===currentAlarmId);
+    if(r) playSound(r.sound,true);
+  }
+}
+
 async function processQueue(){
   if(!ringQueue.length) return;
   const id=ringQueue[0];
@@ -684,6 +697,10 @@ async function processQueue(){
   document.getElementById('ameta').textContent=(r.note?r.note+'\n':'')+fmtDT(r.date,r.time);
   buildSnoozeGrid();
   document.getElementById('ov').classList.add('show');
+  // iOS Safari блокирует автозвук — показываем кнопку "нажмите для звука"
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||
+    (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  document.getElementById('ios-sound-btn').style.display=isIOS?'block':'none';
   if(bellInterval){clearInterval(bellInterval);bellInterval=null;}
   const isCustom=!!customTracks.find(x=>x.id===r.sound)||
     !!EMBEDDED_TRACKS.find(x=>x.id===r.sound);
