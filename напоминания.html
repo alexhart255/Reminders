@@ -714,7 +714,7 @@ function stInfo(r){
   const now=Date.now();
   if(r.fired&&r.eventMs>now) return['Получено','bg'];
   if(r.eventMs<now) return['Прошло','br'];
-  const diff=r.alertMs-now;
+  const diff=r.eventMs-now;
   if(diff<0) return['Скоро!','ba'];
   const m=Math.round(diff/60000);
   const rep=r.repeatCount?` (повтор ${r.repeatCount})`:'';
@@ -746,7 +746,7 @@ function updateCountdowns(){
       el.textContent=r.eventMs<now?'Прошло':'Получено';
       return;
     }
-    const diff=r.alertMs-now;
+    const diff=r.eventMs-now;
     if(diff<0){el.textContent='Скоро!';return;}
     el.textContent=fmtCountdown(diff);
   });
