@@ -116,7 +116,26 @@
   <div class="card">
     <div class="fg">
       <div class="field"><label>Дата</label><input type="date" id="inp-date"></div>
-      <div class="field"><label>Время события</label><input type="time" id="inp-time"></div>
+      <div class="field"><label>Время события</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <select id="inp-time-h" style="flex:1;text-align:center" onchange="onHourChange()">
+            <option value="" disabled selected>чч</option>
+            <option>00</option><option>01</option><option>02</option><option>03</option>
+            <option>04</option><option>05</option><option>06</option><option>07</option>
+            <option>08</option><option>09</option><option>10</option><option>11</option>
+            <option>12</option><option>13</option><option>14</option><option>15</option>
+            <option>16</option><option>17</option><option>18</option><option>19</option>
+            <option>20</option><option>21</option><option>22</option><option>23</option>
+          </select>
+          <span style="font-weight:700;color:var(--muted)">:</span>
+          <select id="inp-time-m" style="flex:1;text-align:center">
+            <option value="" disabled selected>мм</option>
+            <option>00</option><option>05</option><option>10</option><option>15</option>
+            <option>20</option><option>25</option><option>30</option><option>35</option>
+            <option>40</option><option>45</option><option>50</option><option>55</option>
+          </select>
+        </div>
+      </div>
       <div class="field"><label>Напомнить за</label>
         <select id="inp-before">
           <option value="0">В само время</option>
@@ -559,9 +578,17 @@ function selectSound(id){
 // ─── Reminders ────────────────────────────────────────────────────────────────
 function save(){} // данные сохраняются в Supabase
 
+function onHourChange(){
+  const mSel=document.getElementById('inp-time-m');
+  if(!mSel.value||mSel.value===''){mSel.value='00';}
+  mSel.focus();
+}
+
 function addReminder(){
   const date=document.getElementById('inp-date').value;
-  const time=document.getElementById('inp-time').value;
+  const h=document.getElementById('inp-time-h').value;
+  const m=document.getElementById('inp-time-m').value;
+  const time=(h&&m)?`${h}:${m}`:'';
   const title=document.getElementById('inp-title').value.trim();
   const note=document.getElementById('inp-note').value.trim();
   const before=parseInt(document.getElementById('inp-before').value);
