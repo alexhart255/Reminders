@@ -331,7 +331,8 @@ async function dbLoad(){
       id:x.id,date:x.date,time:x.time,title:x.title,note:x.note||'',
       before:x.before||0,repeat:x.repeat||0,repeatUntil:x.repeat_until||0,
       alertMs:x.alert_ms,eventMs:x.event_ms,fired:x.fired||false,
-      sound:x.sound||'bell',repeatCount:x.repeat_count||0
+      sound:x.sound||'bell',repeatCount:x.repeat_count||0,
+      priority:x.priority||'none'
     }));
     render();
   }catch(e){console.warn('Supabase load error:',e);}
@@ -341,7 +342,7 @@ async function dbSave(r){
   const row={id:r.id,date:r.date,time:r.time,title:r.title,note:r.note,
     before:r.before,repeat:r.repeat,repeat_until:r.repeatUntil,
     alert_ms:r.alertMs,event_ms:r.eventMs,fired:r.fired,
-    sound:r.sound,repeat_count:r.repeatCount||0};
+    sound:r.sound,repeat_count:r.repeatCount||0,priority:r.priority||'none'};
   try{
     await fetch(SUPA_URL+'/rest/v1/Reminders',{
       method:'POST',
@@ -352,7 +353,7 @@ async function dbSave(r){
 }
 
 async function dbUpdate(r){
-  const row={fired:r.fired,alert_ms:r.alertMs,repeat_count:r.repeatCount||0};
+  const row={fired:r.fired,alert_ms:r.alertMs,repeat_count:r.repeatCount||0,priority:r.priority||'none'};
   try{
     await fetch(SUPA_URL+'/rest/v1/Reminders?id=eq.'+r.id,{
       method:'PATCH',headers:SUPA_HEADERS,body:JSON.stringify(row)
