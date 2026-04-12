@@ -599,7 +599,7 @@ function addReminder(){
   const alertMs=eventMs-before*60000;
   const nr={id:Date.now(),date,time,title,note,before,eventMs,alertMs,sound:selectedSound,fired:false,repeat,repeatUntil,repeatCount:0};
   reminders.push(nr);
-  reminders.sort((a,b)=>a.alertMs-b.alertMs);
+  reminders.sort((a,b)=>a.eventMs-b.eventMs);
   dbSave(nr);render();
   document.getElementById('inp-title').value='';
   document.getElementById('inp-note').value='';
