@@ -334,7 +334,8 @@ async function dbLoad(){
       sound:x.sound||'bell',repeatCount:x.repeat_count||0,
       priority:x.priority||'none'
     }));
-    render();
+    // Не вызываем render во время звонка — это не прерывает аудио
+    if(currentAlarmId===null) render();
   }catch(e){console.warn('Supabase load error:',e);}
 }
 
@@ -684,12 +685,19 @@ async function processQueue(){
   buildSnoozeGrid();
   document.getElementById('ov').classList.add('show');
   if(bellInterval){clearInterval(bellInterval);bellInterval=null;}
-  const isCustom=!!customTracks.find(x=>x.id===r.sound);
+  const isCustom=!!customTracks.find(x=>x.id===r.sound)||
+    !!EMBEDDED_TRACKS.find(x=>x.id===r.sound);
   if(isCustom){
-    await playSound(r.sound,true);
+    // Кастомный/встроенный трек — играем один раз с loop, не перезапускаем
+    if(!alarmAudio||alarmAudio.paused||alarmAudio.ended){
+      await playSound(r.sound,true);
+    }
   } else {
     playSound(r.sound,false);
-    bellInterval=setInterval(()=>playSound(r.sound,false),5000);
+    bellInterval=setInterval(()=>{
+      // Не прерываем если уже играет
+      if(!alarmAudio||alarmAudio.paused||alarmAudio.ended) playSound(r.sound,false);
+    },5000);
   }
   render();
 }
