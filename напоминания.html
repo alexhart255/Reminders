@@ -82,7 +82,7 @@
   .ri-main{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
   .ri-left{flex:1;min-width:0}
   .ri-title{font-size:22px;font-weight:700;margin-bottom:2px;line-height:1.2}
-  .ri-date{font-size:13px;font-weight:500;color:var(--muted);margin-bottom:2px}
+  .ri-date{font-size:15px;font-weight:500;color:var(--muted);margin-bottom:2px}
   .ri-note{font-size:13px;color:var(--muted);margin-top:2px;white-space:pre-wrap}
   .ri-badges{display:flex;flex-direction:column;gap:6px;align-items:stretch;flex-shrink:0;min-width:155px}
   .badge{font-size:13px;padding:5px 12px;border-radius:var(--rs);border:.5px solid;font-weight:600;white-space:nowrap;text-align:center}
@@ -108,6 +108,15 @@
   .sz-btn{font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;border-radius:20px;padding:5px 14px;border:.5px solid var(--border);background:var(--bg);color:var(--text);transition:background .15s,border-color .15s}
   .sz-btn:hover{border-color:var(--accent);background:var(--blue-bg);color:var(--blue-t)}
   .sz-btn.picked{background:var(--accent);border-color:var(--accent);color:#fff}
+  .priority-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+  .priority-label{font-size:13px;color:var(--muted);font-weight:500;white-space:nowrap}
+  .prio-btn{width:30px;height:30px;border-radius:50%;border:2.5px solid transparent;cursor:pointer;transition:transform .15s,border-color .15s;flex-shrink:0;outline:none}
+  .prio-btn:hover{transform:scale(1.18)}
+  .prio-btn.sel{border-color:#fff;box-shadow:0 0 0 2px rgba(0,0,0,.35)}
+  .prio-red{background:#e24b4a}
+  .prio-amber{background:#f0a820}
+  .prio-green{background:#4caf50}
+  .prio-none{background:var(--border-h);border-color:var(--border)}
 </style>
 </head>
 <body>
@@ -191,6 +200,14 @@
       <div class="sound-dropdown" id="sound-dd">
         <div class="sd-inner" id="sd-inner"></div>
       </div>
+    </div>
+    <div class="priority-row">
+      <span class="priority-label">Важность:</span>
+      <button type="button" class="prio-btn prio-none sel" id="prio-none" onclick="selectPriority('none')" title="Без цвета"></button>
+      <button type="button" class="prio-btn prio-red" id="prio-red" onclick="selectPriority('red')" title="Очень важно (красный)"></button>
+      <button type="button" class="prio-btn prio-amber" id="prio-amber" onclick="selectPriority('amber')" title="Средне важно (жёлтый)"></button>
+      <button type="button" class="prio-btn prio-green" id="prio-green" onclick="selectPriority('green')" title="Не очень важно (зелёный)"></button>
+      <span id="prio-hint" style="font-size:12px;color:var(--muted);margin-left:4px"></span>
     </div>
     <button class="btn btn-primary" onclick="addReminder()">+ Добавить напоминание</button>
   </div>
@@ -361,6 +378,7 @@ let ringQueue=[],currentAlarmId=null,bellInterval=null;
 let alarmAudio=null;
 let pickedSnooze=5;
 let ddOpen=false;
+let selectedPriority="none";
 // object URL кэш: id -> objectURL
 const urlCache={};
 
@@ -578,6 +596,17 @@ function selectSound(id){
 // ─── Reminders ────────────────────────────────────────────────────────────────
 function save(){} // данные сохраняются в Supabase
 
+function selectPriority(p){
+  selectedPriority=p;
+  ["none","red","amber","green"].forEach(x=>{
+    const b=document.getElementById("prio-"+x);
+    if(b) b.classList.toggle("sel",x===p);
+  });
+  const hints={"none":"","red":"🔴 Очень важно","amber":"🟡 Средне важно","green":"🟢 Мало важно"};
+  const h=document.getElementById("prio-hint");
+  if(h) h.textContent=hints[p]||"";
+}
+
 function onHourChange(){
   const mSel=document.getElementById('inp-time-m');
   if(!mSel.value||mSel.value===''){mSel.value='00';}
@@ -597,13 +626,23 @@ function addReminder(){
   if(!date||!time||!title){alert('Пожалуйста, заполните дату, время и название.');return;}
   const eventMs=new Date(date+'T'+time).getTime();
   const alertMs=eventMs-before*60000;
-  const nr={id:Date.now(),date,time,title,note,before,eventMs,alertMs,sound:selectedSound,fired:false,repeat,repeatUntil,repeatCount:0};
+  const nr={id:Date.now(),date,time,title,note,before,eventMs,alertMs,sound:selectedSound,fired:false,repeat,repeatUntil,repeatCount:0,priority:selectedPriority};
   reminders.push(nr);
   reminders.sort((a,b)=>a.eventMs-b.eventMs);
   dbSave(nr);render();
   document.getElementById('inp-title').value='';
   document.getElementById('inp-note').value='';
+  selectPriority('none');
   if(ddOpen) toggleDD();
+}
+
+function changeReminderPriority(id, p){
+  const r=reminders.find(x=>x.id===id);
+  if(!r) return;
+  r.priority=p;
+  dbUpdate(r);
+  render();
+  updateCountdowns();
 }
 
 function deleteReminder(id){
@@ -760,13 +799,21 @@ function render(){
     const ringing=currentAlarmId===r.id;
     const now2=Date.now();
     const cdCls=r.fired?'bg':r.eventMs<now2?'br':r.alertMs-now2<0?'ba':'bb';
+    const prioColors={red:'#e24b4a',amber:'#f0a820',green:'#4caf50',none:''};
+    const prioStyle=r.priority&&r.priority!=='none'?`color:${prioColors[r.priority]}`:'';
     return`<div class="ri${ringing?' ringing':''}" id="ri-${r.id}">
       <div class="ri-body">
         <div class="ri-main">
           <div class="ri-left">
-            <div class="ri-title">${esc(r.title)}</div>
-            <div class="ri-date">${fmtDT(r.date,r.time)}</div>
+            <div class="ri-title" style="${prioStyle}">${esc(r.title)}</div>
+            <div class="ri-date" style="${prioStyle}">${fmtDT(r.date,r.time)}</div>
             ${r.note?`<div class="ri-note">${esc(r.note)}</div>`:''}
+            <div style="display:flex;gap:6px;margin-top:7px">
+              <button type="button" class="prio-btn prio-none${!r.priority||r.priority==='none'?' sel':''}" onclick="changeReminderPriority(${r.id},'none')" title="Без цвета" style="width:18px;height:18px;flex-shrink:0"></button>
+              <button type="button" class="prio-btn prio-red${r.priority==='red'?' sel':''}" onclick="changeReminderPriority(${r.id},'red')" title="Очень важно" style="width:18px;height:18px;flex-shrink:0"></button>
+              <button type="button" class="prio-btn prio-amber${r.priority==='amber'?' sel':''}" onclick="changeReminderPriority(${r.id},'amber')" title="Средне важно" style="width:18px;height:18px;flex-shrink:0"></button>
+              <button type="button" class="prio-btn prio-green${r.priority==='green'?' sel':''}" onclick="changeReminderPriority(${r.id},'green')" title="Мало важно" style="width:18px;height:18px;flex-shrink:0"></button>
+            </div>
           </div>
           <div class="ri-badges">
             <span class="badge ${cdCls} countdown" id="cd-${r.id}"></span>
