@@ -240,6 +240,7 @@
 // ─── Built-in sounds ─────────────────────────────────────────────────────────
 const BUILTINS=[
   {id:'bell',   label:'Колокол',  icon:'🔔', play(c){const t=c.currentTime;[[880,0],[1108,.18],[1318,.36],[880,.54],[660,.72]].forEach(([f,d])=>tn(c,'sine',f,t+d,.55,.3))}},
+  {id:'silent', label:'Без звука', icon:'🔇', play(c){}},
   {id:'chime',  label:'Курант',   icon:'🎵', play(c){const t=c.currentTime;[659,587,523,392,523,659,587,392,392,523,659,587,659,523,587,392].forEach((f,i)=>tn(c,'sine',f,t+i*.22,.35,.22))}},
   {id:'ding',   label:'Динь',     icon:'✨', play(c){const t=c.currentTime;tn(c,'sine',1760,t,1.2,.4);tn(c,'sine',2093,t+.05,.9,.2)}},
   {id:'alarm',  label:'Будильник',icon:'⏰', play(c){const t=c.currentTime;for(let i=0;i<6;i++){tn(c,'square',880,t+i*.18,.12,.2);tn(c,'square',1109,t+i*.18+.09,.08,.18)}}},
@@ -409,6 +410,7 @@ function stopAlarmAudio(){
 }
 
 async function playSound(id,loop){
+  if(id==='silent') return;
   stopAlarmAudio();
   const b=BUILTINS.find(x=>x.id===id);
   if(b){b.play(getCtx());return;}
@@ -700,7 +702,7 @@ async function processQueue(){
   // iOS Safari блокирует автозвук — показываем кнопку "нажмите для звука"
   const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||
     (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
-  document.getElementById('ios-sound-btn').style.display=isIOS?'block':'none';
+  document.getElementById('ios-sound-btn').style.display=(isIOS&&r.sound!=='silent')?'block':'none';
   if(bellInterval){clearInterval(bellInterval);bellInterval=null;}
   const isCustom=!!customTracks.find(x=>x.id===r.sound)||
     !!EMBEDDED_TRACKS.find(x=>x.id===r.sound);
@@ -710,11 +712,12 @@ async function processQueue(){
       await playSound(r.sound,true);
     }
   } else {
-    playSound(r.sound,false);
-    bellInterval=setInterval(()=>{
-      // Не прерываем если уже играет
-      if(!alarmAudio||alarmAudio.paused||alarmAudio.ended) playSound(r.sound,false);
-    },5000);
+    if(r.sound!=='silent'){
+      playSound(r.sound,false);
+      bellInterval=setInterval(()=>{
+        if(!alarmAudio||alarmAudio.paused||alarmAudio.ended) playSound(r.sound,false);
+      },5000);
+    }
   }
   render();
 }
