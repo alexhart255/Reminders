@@ -108,12 +108,6 @@
   .sz-btn{font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;border-radius:20px;padding:5px 14px;border:.5px solid var(--border);background:var(--bg);color:var(--text);transition:background .15s,border-color .15s}
   .sz-btn:hover{border-color:var(--accent);background:var(--blue-bg);color:var(--blue-t)}
   .sz-btn.picked{background:var(--accent);border-color:var(--accent);color:#fff}
-  #edit-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:flex-start;justify-content:center;padding:1.5rem 1rem;overflow-y:auto}
-  #edit-ov.show{display:flex}
-  .edit-box{background:var(--surface);border-radius:var(--r);padding:1.5rem;max-width:500px;width:100%;border:.5px solid var(--border);margin:auto}
-  .edit-box h2{font-size:16px;font-weight:600;margin-bottom:1.2rem;display:flex;align-items:center;gap:8px}
-  .edit-btn{background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:4px 7px;border-radius:var(--rs);flex-shrink:0;line-height:1;transition:background .15s,color .15s}
-  .edit-btn:hover{background:var(--blue-bg);color:var(--blue-t)}
   .priority-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
   .priority-label{font-size:13px;color:var(--muted);font-weight:500;white-space:nowrap}
   .prio-btn{width:30px;height:30px;border-radius:50%;border:2.5px solid transparent;cursor:pointer;transition:transform .15s,border-color .15s;flex-shrink:0;outline:none}
@@ -857,106 +851,10 @@ function render(){
           </div>
         </div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:4px;align-items:center">
-        <button class="edit-btn" onclick="openEditModal(${r.id})" title="Редактировать">✏️</button>
-        <button class="del-btn" onclick="deleteReminder(${r.id})" title="Удалить">✕</button>
-      </div>
+      <button class="del-btn" onclick="deleteReminder(${r.id})" title="Удалить">✕</button>
     </div>`;
   }).join('');
 }
-
-
-// ─── Edit Modal ───────────────────────────────────────────────────────────────
-let editSound = 'bell';
-
-function openEditModal(id){
-  const r = reminders.find(x => x.id === id);
-  if(!r) return;
-  document.getElementById('edit-id').value = id;
-  document.getElementById('edit-date').value = r.date;
-  document.getElementById('edit-time-h').value = r.time.split(':')[0];
-  document.getElementById('edit-time-m').value = r.time.split(':')[1];
-  document.getElementById('edit-before').value = r.before;
-  document.getElementById('edit-repeat').value = r.repeat || 0;
-  document.getElementById('edit-title').value = r.title;
-  document.getElementById('edit-note').value = r.note || '';
-  editSound = r.sound || 'bell';
-  setEditPriority(r.priority || 'none');
-  buildEditSoundRow();
-  document.getElementById('edit-ov').classList.add('show');
-}
-
-function buildEditSoundRow(){
-  const row = document.getElementById('edit-sound-row');
-  const allSounds = [...BUILTINS, ...EMBEDDED_TRACKS, ...customTracks.map(t=>({id:t.id,label:t.name,icon:'🎧'}))];
-  row.innerHTML = allSounds.map(s => `
-    <button type="button" onclick="setEditSound('${s.id}')" id="esnd-${s.id}"
-      style="font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;border-radius:20px;
-      padding:5px 10px;border:.5px solid var(--border);background:${editSound===s.id?'var(--accent)':'var(--bg)'};
-      color:${editSound===s.id?'#fff':'var(--text)'};transition:background .15s">
-      ${s.icon||'🎵'} ${s.label||s.name||''}
-    </button>`).join('');
-}
-
-function setEditSound(id){
-  editSound = id;
-  buildEditSoundRow();
-}
-
-function setEditPriority(p){
-  ['none','red','amber','green'].forEach(x => {
-    const b = document.getElementById('edit-prio-'+x);
-    if(b) b.classList.toggle('sel', x===p);
-  });
-  document.getElementById('edit-prio-none').dataset.selected = p;
-}
-
-function getEditPriority(){
-  const btn = document.getElementById('edit-prio-none');
-  return btn ? (btn.dataset.selected || 'none') : 'none';
-}
-
-function closeEditModal(){
-  document.getElementById('edit-ov').classList.remove('show');
-}
-
-function saveEdit(){
-  const id = parseInt(document.getElementById('edit-id').value);
-  const r = reminders.find(x => x.id === id);
-  if(!r) return;
-  const date = document.getElementById('edit-date').value;
-  const h = document.getElementById('edit-time-h').value;
-  const m = document.getElementById('edit-time-m').value;
-  const title = document.getElementById('edit-title').value.trim();
-  const note = document.getElementById('edit-note').value.trim();
-  const before = parseInt(document.getElementById('edit-before').value);
-  const repeat = parseInt(document.getElementById('edit-repeat').value);
-  if(!date || !h || !m || !title){ alert('Заполните дату, время и название.'); return; }
-  const eventMs = new Date(date+'T'+h+':'+m).getTime();
-  const alertMs = eventMs - before*60000;
-  r.date = date;
-  r.time = h+':'+m;
-  r.title = title;
-  r.note = note;
-  r.before = before;
-  r.repeat = repeat;
-  r.eventMs = eventMs;
-  r.alertMs = alertMs;
-  r.sound = editSound;
-  r.priority = getEditPriority();
-  r.fired = false;
-  r.repeatCount = 0;
-  reminders.sort((a,b) => a.eventMs - b.eventMs);
-  dbSave(r);
-  closeEditModal();
-  render();
-  updateCountdowns();
-}
-
-// Закрыть по клику на фон
-document.getElementById('edit-ov').addEventListener('click', function(e){
-  if(e.target === this) closeEditModal();
-});
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 const today=new Date();
