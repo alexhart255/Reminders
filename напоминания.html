@@ -354,17 +354,17 @@
 <script>
 // ─── Built-in sounds ─────────────────────────────────────────────────────────
 const BUILTINS=[
-  {id:'bell',   label:'Колокол',  icon:'🔔', play(c){const t=c.currentTime;[[880,0],[1108,.18],[1318,.36],[880,.54],[660,.72]].forEach(([f,d])=>tn(c,'sine',f,t+d,.55,.3))}},
-  {id:'silent', label:'Без звука', icon:'🔇', play(c){}},
-  {id:'chime',  label:'Курант',   icon:'🎵', play(c){const t=c.currentTime;[659,587,523,392,523,659,587,392,392,523,659,587,659,523,587,392].forEach((f,i)=>tn(c,'sine',f,t+i*.22,.35,.22))}},
-  {id:'ding',   label:'Динь',     icon:'✨', play(c){const t=c.currentTime;tn(c,'sine',1760,t,1.2,.4);tn(c,'sine',2093,t+.05,.9,.2)}},
-  {id:'alarm',  label:'Будильник',icon:'⏰', play(c){const t=c.currentTime;for(let i=0;i<6;i++){tn(c,'square',880,t+i*.18,.12,.2);tn(c,'square',1109,t+i*.18+.09,.08,.18)}}},
-  {id:'soft',   label:'Мягкий',   icon:'🌙', play(c){const t=c.currentTime;[[523,0],[659,.3],[784,.6],[1047,.9]].forEach(([f,d])=>tn(c,'sine',f,t+d,.7,.15))}},
-  {id:'digital',label:'Цифровой', icon:'💻', play(c){const t=c.currentTime;for(let i=0;i<3;i++){tn(c,'square',1200,t+i*.25,.12,.22);tn(c,'square',900,t+i*.25+.13,.1,.18)}}},
-  {id:'fanfare',label:'Фанфара',  icon:'📯', play(c){const t=c.currentTime;const s=[392,523,659,784,784,784],d=[.12,.12,.12,.18,.18,.4];let p=0;s.forEach((f,i)=>{tn(c,'sawtooth',f,t+p,d[i]+.15,.2);p+=d[i]})}},
-  {id:'marimba',label:'Маримба',  icon:'🎶', play(c){const t=c.currentTime;[[784,0],[1047,.15],[1319,.3],[1568,.45],[1047,.65],[784,.8]].forEach(([f,d])=>{tn(c,'sine',f,t+d,.4,.25);tn(c,'sine',f*2,t+d,.15,.1)})}},
-  {id:'pulse',  label:'Пульс',    icon:'💗', play(c){const t=c.currentTime;for(let i=0;i<4;i++){tn(c,'sine',440,t+i*.35,.1,.28);tn(c,'sine',440,t+i*.35+.15,.08,.2)}}},
-  {id:'nature', label:'Природа',  icon:'🌿', play(c){const t=c.currentTime;for(let i=0;i<12;i++){tn(c,'sine',1200+Math.sin(i*1.1)*200+i*40,t+i*.08,.12,.12)}}},
+  {id:'twitter', label:'Twitter',   icon:'🐦', play(c){
+    const t=c.currentTime;
+    // Classic Twitter notification sound: two quick ascending chirps
+    tn(c,'sine',1046,t,.06,.35);
+    tn(c,'sine',1318,t+.07,.06,.35);
+    tn(c,'sine',1567,t+.14,.06,.35);
+    tn(c,'sine',1318,t+.21,.06,.3);
+    tn(c,'sine',1567,t+.28,.08,.35);
+    tn(c,'sine',2093,t+.36,.12,.4);
+  }},
+  {id:'silent',  label:'Без звука', icon:'🔇', play(c){}},
 ];
 
 function tn(ctx,type,freq,start,dur,vol){
@@ -450,7 +450,7 @@ async function dbLoad(){
       id:x.id,date:x.date,time:x.time,title:x.title,note:x.note||'',
       before:x.before||0,repeat:x.repeat||0,repeatUntil:x.repeat_until||0,
       alertMs:x.alert_ms,eventMs:x.event_ms,fired:x.fired||false,
-      sound:x.sound||'bell',repeatCount:x.repeat_count||0,
+      sound:x.sound||'twitter',repeatCount:x.repeat_count||0,
       priority:x.priority||'none'
     }));
     // Не вызываем render во время звонка — это не прерывает аудио
@@ -493,7 +493,7 @@ async function dbDelete(id){
 // customTracks в localStorage хранит только {id, name} — без данных файла
 let reminders=[];
 let customTracks=JSON.parse(localStorage.getItem('custom_tracks_meta')||'[]');
-let selectedSound=localStorage.getItem('sel_sound')||'bell';
+let selectedSound=localStorage.getItem('sel_sound')||'twitter';
 let audioCtx=null;
 let ringQueue=[],currentAlarmId=null,bellInterval=null;
 let alarmAudio=null;
@@ -640,7 +640,7 @@ async function deleteTrack(id){
   localStorage.setItem('custom_tracks_meta',JSON.stringify(customTracks));
   await idbDelete(id);
   if(urlCache[id]){URL.revokeObjectURL(urlCache[id]);delete urlCache[id];}
-  if(selectedSound===id){selectedSound='bell';localStorage.setItem('sel_sound','bell');}
+  if(selectedSound===id){selectedSound='twitter';localStorage.setItem('sel_sound','twitter');}
   buildSoundSelector();
 }
 
@@ -658,14 +658,14 @@ function buildSoundSelector(){
   dd.innerHTML=`
     ${BUILTINS.map(s=>`
       <button class="ab${s.id===selectedSound?' sel':''}" id="ab-${s.id}" onclick="selectSound('${s.id}')">
-        <button class="pb" data-preview-id="${s.id}" onclick="event.stopPropagation();previewSound('${s.id}')" title="Послушать">▶</button>
+        <span class="pb" data-preview-id="${s.id}" onclick="event.stopPropagation();previewSound('${s.id}')" title="Послушать">▶</span>
         <span class="ai">${s.icon}</span>
         <span class="al">${s.label}</span>
       </button>`).join('')}
     ${EMBEDDED_TRACKS.length?'<hr class="sd-sep"><div style="grid-column:1/-1;font-size:12px;color:var(--muted);font-weight:500;margin-bottom:8px">Зашитые мелодии</div>':''}
     ${EMBEDDED_TRACKS.map(s=>`
       <button class="ab${s.id===selectedSound?' sel':''}" id="ab-${s.id}" onclick="selectSound('${s.id}')">
-        <button class="pb" data-preview-id="${s.id}" onclick="event.stopPropagation();previewSound('${s.id}')" title="Послушать">▶</button>
+        <span class="pb" data-preview-id="${s.id}" onclick="event.stopPropagation();previewSound('${s.id}')" title="Послушать">▶</span>
         <span class="ai">${s.icon}</span>
         <span class="al">${s.name}</span>
       </button>`).join('')}
@@ -974,21 +974,21 @@ function render(){
 
 // ─── Edit Modal ───────────────────────────────────────────────────────────────
 let editDDOpen=false;
-let editSelectedSound='bell';
+let editSelectedSound='twitter';
 let editSelectedPriority='none';
 
 function buildEditSoundSelector(){
   const inner=document.getElementById('edit-sd-inner');
   inner.innerHTML=BUILTINS.map(s=>`
     <button class="ab${s.id===editSelectedSound?' sel':''}" id="eab-${s.id}" onclick="selectEditSound('${s.id}')">
-      <button class="pb" onclick="event.stopPropagation();previewSound('${s.id}')" title="Послушать">▶</button>
+      <span class="pb" onclick="event.stopPropagation();previewSound('${s.id}')" title="Послушать">▶</span>
       <span class="ai">${s.icon}</span>
       <span class="al">${s.label}</span>
     </button>`).join('')+
     (EMBEDDED_TRACKS.length?'<hr class="sd-sep"><div style="grid-column:1/-1;font-size:11px;color:var(--muted);margin-bottom:4px">Зашитые мелодии</div>':'')+
     EMBEDDED_TRACKS.map(s=>`
     <button class="ab${s.id===editSelectedSound?' sel':''}" id="eab-${s.id}" onclick="selectEditSound('${s.id}')">
-      <button class="pb" onclick="event.stopPropagation();previewSound('${s.id}')" title="Послушать">▶</button>
+      <span class="pb" onclick="event.stopPropagation();previewSound('${s.id}')" title="Послушать">▶</span>
       <span class="ai">${s.icon}</span>
       <span class="al">${s.name}</span>
     </button>`).join('')+
@@ -1046,7 +1046,7 @@ function openEditModal(id){
   document.getElementById('edit-repeat').value=r.repeat||0;
   document.getElementById('edit-repeat-until').value=r.repeatUntil||0;
   // Sound
-  editSelectedSound=r.sound||'bell';
+  editSelectedSound=r.sound||'twitter';
   const m2=soundMeta(editSelectedSound);
   document.getElementById('edit-sound-icon').textContent=m2.icon;
   document.getElementById('edit-sound-label').textContent=m2.label;
