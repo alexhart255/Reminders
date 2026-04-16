@@ -117,6 +117,20 @@
   .prio-amber{background:#f0a820}
   .prio-green{background:#4caf50}
   .prio-none{background:var(--border-h);border-color:var(--border)}
+  /* Edit button in reminder list */
+  .edit-btn{background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:4px 6px;border-radius:var(--rs);flex-shrink:0;line-height:1;transition:background .15s,color .15s}
+  .edit-btn:hover{background:var(--blue-bg);color:var(--blue-t)}
+  /* Edit modal */
+  #edit-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center;padding:1rem}
+  #edit-ov.show{display:flex}
+  .edit-box{background:var(--surface);border-radius:var(--r);padding:1.5rem;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;border:.5px solid var(--border)}
+  .edit-box h2{font-size:17px;font-weight:600;margin-bottom:1rem}
+  .edit-sound-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+  .edit-sound-pill{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border:.5px solid var(--border);border-radius:20px;background:var(--bg);cursor:pointer;font-family:inherit;font-size:13px;font-weight:500;color:var(--text);transition:border-color .15s,background .15s}
+  .edit-sound-pill.active{border-color:var(--accent);background:var(--blue-bg);color:var(--blue-t)}
+  .edit-sound-dd{display:none;border:.5px solid var(--border);border-radius:var(--r);padding:10px;display:none;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
+  .edit-sound-dd.open{display:grid}
+  @media(max-width:400px){.edit-sound-dd{grid-template-columns:repeat(3,1fr)}}
 </style>
 </head>
 <body>
@@ -235,6 +249,107 @@
 </div>
 
 <input type="file" id="file-input" accept="audio/*" multiple>
+
+<!-- Edit Reminder Modal -->
+<div id="edit-ov">
+  <div class="edit-box">
+    <h2>✏️ Изменить напоминание</h2>
+    <input type="hidden" id="edit-id">
+    <div class="fg">
+      <div class="field"><label>Дата</label><input type="date" id="edit-date"></div>
+      <div class="field"><label>Время</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <select id="edit-time-h" style="flex:1;text-align:center" onchange="onEditHourChange()">
+            <option value="" disabled selected>чч</option>
+            <option>00</option><option>01</option><option>02</option><option>03</option>
+            <option>04</option><option>05</option><option>06</option><option>07</option>
+            <option>08</option><option>09</option><option>10</option><option>11</option>
+            <option>12</option><option>13</option><option>14</option><option>15</option>
+            <option>16</option><option>17</option><option>18</option><option>19</option>
+            <option>20</option><option>21</option><option>22</option><option>23</option>
+          </select>
+          <span style="font-weight:700;color:var(--muted)">:</span>
+          <select id="edit-time-m" style="flex:1;text-align:center">
+            <option value="" disabled selected>мм</option>
+            <option>00</option><option>05</option><option>10</option><option>15</option>
+            <option>20</option><option>25</option><option>30</option><option>35</option>
+            <option>40</option><option>45</option><option>50</option><option>55</option>
+          </select>
+        </div>
+      </div>
+      <div class="field"><label>Напомнить за</label>
+        <select id="edit-before">
+          <option value="0">В само время</option>
+          <option value="5">5 минут</option>
+          <option value="10">10 минут</option>
+          <option value="15">15 минут</option>
+          <option value="30">30 минут</option>
+          <option value="60">1 час</option>
+          <option value="120">2 часа</option>
+          <option value="180">3 часа</option>
+          <option value="240">4 часа</option>
+          <option value="300">5 часов</option>
+          <option value="360">6 часов</option>
+          <option value="720">12 часов</option>
+          <option value="1440">1 день</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg" style="margin-bottom:12px">
+      <div class="field"><label>Повторять</label>
+        <select id="edit-repeat">
+          <option value="0">Не повторять</option>
+          <option value="5">каждые 5 мин</option>
+          <option value="10">каждые 10 мин</option>
+          <option value="15">каждые 15 мин</option>
+          <option value="30">каждые 30 мин</option>
+          <option value="60">каждый час</option>
+          <option value="120">каждые 2 часа</option>
+          <option value="180">каждые 3 часа</option>
+          <option value="300">каждые 5 часов</option>
+          <option value="360">каждые 6 часов</option>
+          <option value="720">каждые 12 часов</option>
+          <option value="1440">каждый день</option>
+        </select>
+      </div>
+      <div class="field"><label>Останавливать</label>
+        <select id="edit-repeat-until">
+          <option value="0">Не останавливать</option>
+          <option value="3">через 3 повтора</option>
+          <option value="5">через 5 повторов</option>
+          <option value="10">через 10 повторов</option>
+          <option value="24">через 24 повтора</option>
+        </select>
+      </div>
+    </div>
+    <div class="frow"><div class="field"><label>Название</label><input type="text" id="edit-title"></div></div>
+    <div class="frow"><div class="field"><label>Заметка</label><textarea id="edit-note" style="min-height:52px"></textarea></div></div>
+    <div class="frow">
+      <div style="font-size:13px;color:var(--muted);font-weight:500;margin-bottom:8px">Звук</div>
+      <div class="edit-sound-row">
+        <button class="edit-sound-pill active" id="edit-sound-toggle" onclick="toggleEditDD()">
+          <span id="edit-sound-icon">🔔</span>
+          <span id="edit-sound-label">Колокол</span>
+          <span style="font-size:10px;opacity:.6" id="edit-pill-arrow">▾</span>
+        </button>
+      </div>
+      <div class="edit-sound-dd" id="edit-sound-dd">
+        <div id="edit-sd-inner" style="display:contents"></div>
+      </div>
+    </div>
+    <div class="priority-row" style="margin-top:10px">
+      <span class="priority-label">Важность:</span>
+      <button type="button" class="prio-btn prio-none sel" id="edit-prio-none" onclick="selectEditPriority('none')" title="Без цвета"></button>
+      <button type="button" class="prio-btn prio-red" id="edit-prio-red" onclick="selectEditPriority('red')" title="Очень важно"></button>
+      <button type="button" class="prio-btn prio-amber" id="edit-prio-amber" onclick="selectEditPriority('amber')" title="Средне важно"></button>
+      <button type="button" class="prio-btn prio-green" id="edit-prio-green" onclick="selectEditPriority('green')" title="Мало важно"></button>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:1rem;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="saveEdit()">✅ Сохранить</button>
+      <button class="btn" onclick="closeEditModal()">Отмена</button>
+    </div>
+  </div>
+</div>
 
 <script>
 // ─── Built-in sounds ─────────────────────────────────────────────────────────
@@ -851,10 +966,149 @@ function render(){
           </div>
         </div>
       </div>
+      <button class="edit-btn" onclick="openEditModal(${r.id})" title="Изменить">✏️</button>
       <button class="del-btn" onclick="deleteReminder(${r.id})" title="Удалить">✕</button>
     </div>`;
   }).join('');
 }
+
+// ─── Edit Modal ───────────────────────────────────────────────────────────────
+let editDDOpen=false;
+let editSelectedSound='bell';
+let editSelectedPriority='none';
+
+function buildEditSoundSelector(){
+  const inner=document.getElementById('edit-sd-inner');
+  inner.innerHTML=BUILTINS.map(s=>`
+    <button class="ab${s.id===editSelectedSound?' sel':''}" id="eab-${s.id}" onclick="selectEditSound('${s.id}')">
+      <button class="pb" onclick="event.stopPropagation();previewSound('${s.id}')" title="Послушать">▶</button>
+      <span class="ai">${s.icon}</span>
+      <span class="al">${s.label}</span>
+    </button>`).join('')+
+    (EMBEDDED_TRACKS.length?'<hr class="sd-sep"><div style="grid-column:1/-1;font-size:11px;color:var(--muted);margin-bottom:4px">Зашитые мелодии</div>':'')+
+    EMBEDDED_TRACKS.map(s=>`
+    <button class="ab${s.id===editSelectedSound?' sel':''}" id="eab-${s.id}" onclick="selectEditSound('${s.id}')">
+      <button class="pb" onclick="event.stopPropagation();previewSound('${s.id}')" title="Послушать">▶</button>
+      <span class="ai">${s.icon}</span>
+      <span class="al">${s.name}</span>
+    </button>`).join('')+
+    (customTracks.length?'<hr class="sd-sep"><div style="grid-column:1/-1;font-size:11px;color:var(--muted);margin-bottom:4px">Свои мелодии</div>':'')+
+    customTracks.map(t=>`
+    <button class="ab${t.id===editSelectedSound?' sel':''}" id="eab-${t.id}" onclick="selectEditSound('${t.id}')">
+      <span class="ai">🎧</span>
+      <span class="al">${esc(t.name)}</span>
+    </button>`).join('');
+}
+
+function toggleEditDD(){
+  editDDOpen=!editDDOpen;
+  document.getElementById('edit-sound-dd').classList.toggle('open',editDDOpen);
+  document.getElementById('edit-pill-arrow').textContent=editDDOpen?'▴':'▾';
+}
+
+function selectEditSound(id){
+  editSelectedSound=id;
+  document.querySelectorAll('#edit-sd-inner .ab').forEach(b=>b.classList.remove('sel'));
+  const btn=document.getElementById('eab-'+id);
+  if(btn) btn.classList.add('sel');
+  const m=soundMeta(id);
+  document.getElementById('edit-sound-icon').textContent=m.icon;
+  document.getElementById('edit-sound-label').textContent=m.label;
+}
+
+function selectEditPriority(p){
+  editSelectedPriority=p;
+  ['none','red','amber','green'].forEach(x=>{
+    const b=document.getElementById('edit-prio-'+x);
+    if(b) b.classList.toggle('sel',x===p);
+  });
+}
+
+function onEditHourChange(){
+  const mSel=document.getElementById('edit-time-m');
+  if(!mSel.value||mSel.value===''){mSel.value='00';}
+  mSel.focus();
+}
+
+function openEditModal(id){
+  const r=reminders.find(x=>x.id===id);
+  if(!r) return;
+  document.getElementById('edit-id').value=id;
+  document.getElementById('edit-date').value=r.date;
+  document.getElementById('edit-title').value=r.title;
+  document.getElementById('edit-note').value=r.note||'';
+  // Time
+  const [h,m]=r.time.split(':');
+  document.getElementById('edit-time-h').value=h;
+  document.getElementById('edit-time-m').value=m;
+  // Before / repeat
+  document.getElementById('edit-before').value=r.before;
+  document.getElementById('edit-repeat').value=r.repeat||0;
+  document.getElementById('edit-repeat-until').value=r.repeatUntil||0;
+  // Sound
+  editSelectedSound=r.sound||'bell';
+  const m2=soundMeta(editSelectedSound);
+  document.getElementById('edit-sound-icon').textContent=m2.icon;
+  document.getElementById('edit-sound-label').textContent=m2.label;
+  editDDOpen=false;
+  document.getElementById('edit-sound-dd').classList.remove('open');
+  document.getElementById('edit-pill-arrow').textContent='▾';
+  buildEditSoundSelector();
+  // Priority
+  selectEditPriority(r.priority||'none');
+  document.getElementById('edit-ov').classList.add('show');
+}
+
+function closeEditModal(){
+  stopAlarmAudio();
+  document.getElementById('edit-ov').classList.remove('show');
+  editDDOpen=false;
+  document.getElementById('edit-sound-dd').classList.remove('open');
+}
+
+async function saveEdit(){
+  const id=parseInt(document.getElementById('edit-id').value);
+  const r=reminders.find(x=>x.id===id);
+  if(!r){closeEditModal();return;}
+  const date=document.getElementById('edit-date').value;
+  const hh=document.getElementById('edit-time-h').value;
+  const mm=document.getElementById('edit-time-m').value;
+  const title=document.getElementById('edit-title').value.trim();
+  if(!date||!hh||!mm||!title){alert('Пожалуйста, заполните дату, время и название.');return;}
+  const time=`${hh}:${mm}`;
+  const before=parseInt(document.getElementById('edit-before').value);
+  const repeat=parseInt(document.getElementById('edit-repeat').value);
+  const repeatUntil=parseInt(document.getElementById('edit-repeat-until').value);
+  const note=document.getElementById('edit-note').value.trim();
+  const eventMs=new Date(date+'T'+time).getTime();
+  const alertMs=eventMs-before*60000;
+  r.date=date; r.time=time; r.title=title; r.note=note;
+  r.before=before; r.repeat=repeat; r.repeatUntil=repeatUntil;
+  r.eventMs=eventMs; r.alertMs=alertMs;
+  r.sound=editSelectedSound; r.priority=editSelectedPriority;
+  r.fired=false; r.repeatCount=0;
+  reminders.sort((a,b)=>a.eventMs-b.eventMs);
+  // Save full row to Supabase
+  const row={id:r.id,date:r.date,time:r.time,title:r.title,note:r.note,
+    before:r.before,repeat:r.repeat,repeat_until:r.repeatUntil,
+    alert_ms:r.alertMs,event_ms:r.eventMs,fired:r.fired,
+    sound:r.sound,repeat_count:r.repeatCount,priority:r.priority};
+  try{
+    await fetch(SUPA_URL+'/rest/v1/Reminders',{
+      method:'POST',
+      headers:{...SUPA_HEADERS,'Prefer':'resolution=merge-duplicates'},
+      body:JSON.stringify(row)
+    });
+  }catch(e){console.warn('Supabase update error:',e);}
+  closeEditModal();
+  render();
+  updateCountdowns();
+}
+
+// Close edit modal on overlay click
+document.getElementById('edit-ov').addEventListener('click',function(e){
+  if(e.target===this) closeEditModal();
+});
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 const today=new Date();
