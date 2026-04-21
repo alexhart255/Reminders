@@ -209,6 +209,8 @@
           <option value="360">каждые 6 часов</option>
           <option value="720">каждые 12 часов</option>
           <option value="1440">каждый день</option>
+          <option value="43200">каждый месяц</option>
+          <option value="525600">каждый год</option>
         </select>
       </div>
       <div class="field" id="repeat-until-field">
@@ -342,6 +344,8 @@
           <option value="360">каждые 6 часов</option>
           <option value="720">каждые 12 часов</option>
           <option value="1440">каждый день</option>
+          <option value="43200">каждый месяц</option>
+          <option value="525600">каждый год</option>
         </select>
       </div>
       <div class="field"><label>Останавливать</label>
@@ -919,12 +923,25 @@ function dismissCurrent(){
         r.repeatCount = (r.repeatCount||0) + 1;
         const maxRepeats = r.repeatUntil || 0;
         if(maxRepeats === 0 || r.repeatCount < maxRepeats){
-          const nextMs = Date.now() + r.repeat * 60000;
+          let nextMs;
+          const pad = n => String(n).padStart(2,'0');
+          if(r.repeat === 43200) {
+            // Каждый месяц — прибавляем 1 месяц по календарю
+            const nd = new Date(r.eventMs);
+            nd.setMonth(nd.getMonth() + 1);
+            nextMs = nd.getTime();
+          } else if(r.repeat === 525600) {
+            // Каждый год — прибавляем 1 год по календарю
+            const nd = new Date(r.eventMs);
+            nd.setFullYear(nd.getFullYear() + 1);
+            nextMs = nd.getTime();
+          } else {
+            nextMs = Date.now() + r.repeat * 60000;
+          }
           r.alertMs = nextMs - r.before * 60000;
           r.eventMs = nextMs;
           // Обновляем дату и время из нового eventMs
           const nd = new Date(nextMs);
-          const pad = n => String(n).padStart(2,'0');
           r.date = `${nd.getFullYear()}-${pad(nd.getMonth()+1)}-${pad(nd.getDate())}`;
           r.time = `${pad(nd.getHours())}:${pad(nd.getMinutes())}`;
           r.fired = false;
@@ -962,7 +979,7 @@ function checkAlarms(){
 // ─── Render ───────────────────────────────────────────────────────────────────
 function fmtDT(date,time){const[y,m,d]=date.split('-');return`${d}.${m}.${y} в ${time}`;}
 function blabel(b){if(b===0)return'в само время';if(b<60)return`за ${b} мин`;if(b<1440)return`за ${b/60} ч`;return`за ${b/1440} д`;}
-function rlabel(r){if(r<60)return`каждые ${r} мин`;if(r===60)return'каждый час';if(r<1440)return`каждые ${r/60} ч`;return'каждый день';}
+function rlabel(r){if(r<60)return`каждые ${r} мин`;if(r===60)return'каждый час';if(r<1440)return`каждые ${r/60} ч`;if(r===43200)return'каждый месяц';if(r===525600)return'каждый год';return'каждый день';}
 function stInfo(r){
   const now=Date.now();
   if(r.fired&&r.eventMs>now) return['Получено','bg'];
@@ -1015,7 +1032,10 @@ function render(){
     if(isRepeating) {
       // Просроченное повторяющееся — всегда показываем (ждёт следующего цикла)
       if(r.eventMs < now7) return true;
-      // Будущее повторяющееся — только если в пределах 7 дней
+      // Месячный/годовой повтор — показываем если в пределах 35/370 дней
+      if(r.repeat === 43200) return r.eventMs <= now7 + 35*24*60*60*1000;
+      if(r.repeat === 525600) return r.eventMs <= now7 + 370*24*60*60*1000;
+      // Остальные повторяющиеся — только если в пределах 7 дней
       return r.eventMs <= in7days;
     }
     return r.eventMs>=now7 && r.eventMs<=in7days;
