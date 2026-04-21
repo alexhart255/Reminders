@@ -1060,10 +1060,7 @@ function render(){
     if(isRepeating) {
       // Просроченное повторяющееся — всегда показываем (ждёт следующего цикла)
       if(r.eventMs < now7) return true;
-      // Месячный/годовой повтор — показываем если в пределах 35/370 дней
-      if(r.repeat === 43200) return r.eventMs <= now7 + 35*24*60*60*1000;
-      if(r.repeat === 525600) return r.eventMs <= now7 + 370*24*60*60*1000;
-      // Остальные повторяющиеся — только если в пределах 7 дней
+      // Все повторяющиеся — показываем только в пределах 7 дней
       return r.eventMs <= in7days;
     }
     return r.eventMs>=now7 && r.eventMs<=in7days;
