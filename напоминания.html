@@ -529,6 +529,33 @@ async function dbLoad(){
       sound:x.sound||'twitter',repeatCount:x.repeat_count||0,
       priority:x.priority||'none'
     }));
+    // Для просроченных повторяющихся — пересчитываем дату на следующую
+    const nowMs = Date.now();
+    const padL = n => String(n).padStart(2,'0');
+    let needSync = false;
+    reminders.forEach(r=>{
+      if(r.repeat && r.repeat>0 && !r.fired && r.eventMs < nowMs) {
+        let nextMs = r.eventMs;
+        // Прокручиваем вперёд пока не окажемся в будущем
+        while(nextMs < nowMs) {
+          if(r.repeat === 43200) {
+            const nd = new Date(nextMs); nd.setMonth(nd.getMonth()+1); nextMs = nd.getTime();
+          } else if(r.repeat === 525600) {
+            const nd = new Date(nextMs); nd.setFullYear(nd.getFullYear()+1); nextMs = nd.getTime();
+          } else {
+            nextMs += r.repeat * 60000;
+          }
+        }
+        r.eventMs = nextMs;
+        r.alertMs = nextMs - r.before * 60000;
+        const nd = new Date(nextMs);
+        r.date = `${nd.getFullYear()}-${padL(nd.getMonth()+1)}-${padL(nd.getDate())}`;
+        r.time = `${padL(nd.getHours())}:${padL(nd.getMinutes())}`;
+        r.fired = false;
+        needSync = true;
+        dbUpdate(r);
+      }
+    });
     // Не вызываем render во время звонка — это не прерывает аудио
     if(currentAlarmId===null) render();
   }catch(e){console.warn('Supabase load error:',e);}
@@ -549,7 +576,8 @@ async function dbSave(r){
 }
 
 async function dbUpdate(r){
-  const row={fired:r.fired,alert_ms:r.alertMs,repeat_count:r.repeatCount||0,priority:r.priority||'none'};
+  const row={fired:r.fired,alert_ms:r.alertMs,event_ms:r.eventMs,
+    date:r.date,time:r.time,repeat_count:r.repeatCount||0,priority:r.priority||'none'};
   try{
     await fetch(SUPA_URL+'/rest/v1/Reminders?id=eq.'+r.id,{
       method:'PATCH',headers:SUPA_HEADERS,body:JSON.stringify(row)
