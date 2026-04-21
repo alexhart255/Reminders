@@ -1288,6 +1288,8 @@ function renderCalResults(){
     }
     // Для повторяющихся — ищем попадание в нужный месяц/год
     if(!r.repeat || r.repeat===0) return;
+    // Повторы меньше 1 дня (< 1440 мин) — временные, не транслируем на другие годы
+    if(r.repeat < 1440) return;
     // Умный прыжок сразу к нужному периоду вместо перебора по одному
     let cur=new Date(baseD);
     const targetMs=new Date(year, month, 1).getTime();
