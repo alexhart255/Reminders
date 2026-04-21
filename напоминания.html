@@ -1288,19 +1288,34 @@ function renderCalResults(){
     }
     // Для повторяющихся — ищем попадание в нужный месяц/год
     if(!r.repeat || r.repeat===0) return;
+    // Умный прыжок сразу к нужному периоду вместо перебора по одному
     let cur=new Date(baseD);
-    // Прокручиваем вперёд или назад до нужного года/месяца
-    // Ограничиваем 1000 итераций
-    for(let i=0;i<1000;i++){
-      if(r.repeat===43200){ cur.setMonth(cur.getMonth()+1); }
-      else if(r.repeat===525600){ cur.setFullYear(cur.getFullYear()+1); }
-      else { cur=new Date(cur.getTime()+r.repeat*60000); }
-      if(cur.getFullYear()>year+1) break; // перешли за нужный год
+    const targetMs=new Date(year, month, 1).getTime();
+    if(cur.getTime() < targetMs) {
+      if(r.repeat===525600){
+        // Прыгаем сразу на нужный год
+        cur.setFullYear(year);
+      } else if(r.repeat===43200){
+        // Прыгаем сразу на нужный месяц/год
+        cur.setFullYear(year); cur.setMonth(month);
+      } else {
+        // Для минутных повторов — прыгаем сразу через разницу в миллисекундах
+        const diff = targetMs - cur.getTime();
+        const steps = Math.ceil(diff / (r.repeat * 60000));
+        cur = new Date(cur.getTime() + steps * r.repeat * 60000);
+      }
+    }
+    // Теперь ищем точное попадание в нужный месяц/год (максимум 100 итераций)
+    for(let i=0;i<100;i++){
+      if(cur.getFullYear() > year) break;
       if(cur.getMonth()===month && cur.getFullYear()===year){
         const ds=`${cur.getFullYear()}-${pad(cur.getMonth()+1)}-${pad(cur.getDate())}`;
         items.push({r, displayDate:ds, displayMs:cur.getTime()});
         break;
       }
+      if(r.repeat===43200){ cur.setMonth(cur.getMonth()+1); }
+      else if(r.repeat===525600){ cur.setFullYear(cur.getFullYear()+1); }
+      else { cur=new Date(cur.getTime()+r.repeat*60000); }
     }
   });
   items.sort((a,b)=>a.displayMs-b.displayMs);
