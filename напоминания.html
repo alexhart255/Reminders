@@ -970,7 +970,7 @@ function closealarm(){
 function checkAlarms(){
   const now=Date.now();
   reminders.forEach(r=>{
-    if(!r.fired&&now>=r.alertMs&&now<r.eventMs+3600000){
+    if(!r.fired&&now>=r.alertMs){
       if(!ringQueue.includes(r.id)){ringQueue.push(r.id);if(ringQueue.length===1)processQueue();}
     }
   });
