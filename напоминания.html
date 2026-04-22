@@ -227,6 +227,17 @@
     <div class="frow"><div class="field"><label>Название / причина</label><input type="text" id="inp-title" placeholder="Например: Приём у врача"></div></div>
     <div class="frow"><div class="field"><label>Заметка (необязательно)</label><textarea id="inp-note" placeholder="Адрес, номер кабинета, что взять с собой..."></textarea></div></div>
     <div class="frow">
+      <div class="field">
+        <label style="font-size:13px;color:var(--muted);font-weight:500">Фото (необязательно)</label>
+        <div id="inp-photo-preview" style="display:none;margin:8px 0;position:relative;width:80px;height:80px">
+          <img id="inp-photo-img" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:.5px solid var(--border)">
+          <button onclick="clearInpPhoto()" style="position:absolute;top:-6px;right:-6px;background:#e24b4a;color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:11px;line-height:1;padding:0">✕</button>
+        </div>
+        <label for="inp-photo-file" class="upload-zone" style="margin-top:4px;display:block;cursor:pointer">📷 Прикрепить фото</label>
+        <input type="file" id="inp-photo-file" accept="image/*" style="display:none" onchange="handleInpPhoto(this)">
+      </div>
+    </div>
+    <div class="frow">
       <div class="sound-label" style="font-size:13px;color:var(--muted);font-weight:500;margin-bottom:8px">Звуковой эффект</div>
       <div class="sound-row" id="sound-row"></div>
       <div class="sound-dropdown" id="sound-dd">
@@ -249,6 +260,7 @@
 
 <div id="ov">
   <div class="abox">
+    <div id="alarm-photo-wrap" style="display:none;margin-bottom:12px"><img id="alarm-photo-img" style="width:100px;height:100px;object-fit:cover;border-radius:50%;border:3px solid var(--accent);margin:0 auto;display:block"></div>
     <span class="aemoji" id="aemoji">🔔</span>
     <div class="atitle" id="atitle"></div>
     <div class="ameta"  id="ameta"></div>
@@ -360,6 +372,17 @@
     </div>
     <div class="frow"><div class="field"><label>Название</label><input type="text" id="edit-title"></div></div>
     <div class="frow"><div class="field"><label>Заметка</label><textarea id="edit-note" style="min-height:52px"></textarea></div></div>
+    <div class="frow">
+      <div class="field">
+        <label style="font-size:13px;color:var(--muted);font-weight:500">Фото</label>
+        <div id="edit-photo-preview" style="display:none;margin:8px 0;position:relative;width:80px;height:80px">
+          <img id="edit-photo-img" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:.5px solid var(--border)">
+          <button onclick="clearEditPhoto()" style="position:absolute;top:-6px;right:-6px;background:#e24b4a;color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:11px;line-height:1;padding:0">✕</button>
+        </div>
+        <label for="edit-photo-file" class="upload-zone" style="margin-top:4px;display:block;cursor:pointer">📷 Изменить фото</label>
+        <input type="file" id="edit-photo-file" accept="image/*" style="display:none" onchange="handleEditPhoto(this)">
+      </div>
+    </div>
     <div class="frow">
       <div style="font-size:13px;color:var(--muted);font-weight:500;margin-bottom:8px">Звук</div>
       <div class="edit-sound-row">
@@ -526,7 +549,7 @@ async function dbLoad(){
       id:x.id,date:x.date,time:x.time,title:x.title,note:x.note||'',
       before:x.before||0,repeat:x.repeat||0,repeatUntil:x.repeat_until||0,
       alertMs:x.alert_ms,eventMs:x.event_ms,fired:x.fired||false,
-      sound:x.sound||'twitter',repeatCount:x.repeat_count||0,
+      sound:x.sound||'silent',repeatCount:x.repeat_count||0,photo:x.photo||null,
       priority:x.priority||'none'
     }));
     // Для просроченных повторяющихся — пересчитываем дату на следующую
@@ -562,7 +585,7 @@ async function dbLoad(){
 }
 
 async function dbSave(r){
-  const row={id:r.id,date:r.date,time:r.time,title:r.title,note:r.note,
+  const row={id:r.id,date:r.date,time:r.time,title:r.title,note:r.note,photo:r.photo||null,
     before:r.before,repeat:r.repeat,repeat_until:r.repeatUntil,
     alert_ms:r.alertMs,event_ms:r.eventMs,fired:r.fired,
     sound:r.sound,repeat_count:r.repeatCount||0,priority:r.priority||'none'};
@@ -577,7 +600,7 @@ async function dbSave(r){
 
 async function dbUpdate(r){
   const row={fired:r.fired,alert_ms:r.alertMs,event_ms:r.eventMs,
-    date:r.date,time:r.time,repeat_count:r.repeatCount||0,priority:r.priority||'none'};
+    date:r.date,time:r.time,repeat_count:r.repeatCount||0,priority:r.priority||'none',photo:r.photo||null};
   try{
     await fetch(SUPA_URL+'/rest/v1/Reminders?id=eq.'+r.id,{
       method:'PATCH',headers:SUPA_HEADERS,body:JSON.stringify(row)
@@ -845,12 +868,13 @@ function addReminder(){
   if(!date||!time||!title){alert('Пожалуйста, заполните дату, время и название.');return;}
   const eventMs=new Date(date+'T'+time).getTime();
   const alertMs=eventMs-before*60000;
-  const nr={id:Date.now(),date,time,title,note,before,eventMs,alertMs,sound:selectedSound,fired:false,repeat,repeatUntil,repeatCount:0,priority:selectedPriority};
+  const nr={id:Date.now(),date,time,title,note,photo:window._inpPhoto||null,before,eventMs,alertMs,sound:selectedSound,fired:false,repeat,repeatUntil,repeatCount:0,priority:selectedPriority};
   reminders.push(nr);
   reminders.sort((a,b)=>a.eventMs-b.eventMs);
   dbSave(nr);render();
   document.getElementById('inp-title').value='';
   document.getElementById('inp-note').value='';
+  clearInpPhoto();
   selectPriority('none');
   if(ddOpen) toggleDD();
 }
@@ -909,6 +933,10 @@ async function processQueue(){
   document.getElementById('aemoji').textContent=m.icon;
   document.getElementById('atitle').textContent=r.title;
   document.getElementById('ameta').textContent=(r.note?r.note+'\n':'')+fmtDT(r.date,r.time);
+  const aphotoWrap=document.getElementById('alarm-photo-wrap');
+  const aphotoImg=document.getElementById('alarm-photo-img');
+  if(r.photo){aphotoWrap.style.display='block';aphotoImg.src=r.photo;}
+  else{aphotoWrap.style.display='none';aphotoImg.src='';}
   buildSnoozeGrid();
   document.getElementById('ov').classList.add('show');
   // iOS Safari блокирует автозвук — показываем кнопку "нажмите для звука"
@@ -1077,8 +1105,13 @@ function render(){
       <div class="ri-body">
         <div class="ri-main">
           <div class="ri-left">
-            <div class="ri-title" style="${prioStyle}">${esc(r.title)}</div>
-            <div class="ri-date" style="${prioStyle}">${fmtDT(r.date,r.time)}</div>
+            <div style="display:flex;align-items:center;gap:10px">
+              ${r.photo?`<img src="${r.photo}" style="width:44px;height:44px;object-fit:cover;border-radius:50%;border:2px solid var(--border);flex-shrink:0">`:''}
+              <div>
+                <div class="ri-title" style="${prioStyle}">${esc(r.title)}</div>
+                <div class="ri-date" style="${prioStyle}">${fmtDT(r.date,r.time)}</div>
+              </div>
+            </div>
             ${r.note?`<div class="ri-note">${esc(r.note)}</div>`:''}
             <div style="display:flex;gap:6px;margin-top:7px">
               <button type="button" class="prio-btn prio-none${!r.priority||r.priority==='none'?' sel':''}" onclick="changeReminderPriority(${r.id},'none')" title="Без цвета" style="width:18px;height:18px;flex-shrink:0"></button>
@@ -1169,6 +1202,12 @@ function openEditModal(id){
   document.getElementById('edit-repeat-until').value=r.repeatUntil||0;
   // Sound
   editSelectedSound=r.sound||'silent';
+  // Load photo
+  window._editPhoto=r.photo||null;
+  const eprev=document.getElementById('edit-photo-preview');
+  const eimg=document.getElementById('edit-photo-img');
+  if(r.photo){eprev.style.display='block';eimg.src=r.photo;}
+  else{eprev.style.display='none';eimg.src='';}
   const m2=soundMeta(editSelectedSound);
   document.getElementById('edit-sound-icon').textContent=m2.icon;
   document.getElementById('edit-sound-label').textContent=m2.label;
@@ -1208,10 +1247,11 @@ async function saveEdit(){
   r.before=before; r.repeat=repeat; r.repeatUntil=repeatUntil;
   r.eventMs=eventMs; r.alertMs=alertMs;
   r.sound=editSelectedSound; r.priority=editSelectedPriority;
+  r.photo=window._editPhoto||null;
   r.fired=false; r.repeatCount=0;
   reminders.sort((a,b)=>a.eventMs-b.eventMs);
   // Save full row to Supabase
-  const row={id:r.id,date:r.date,time:r.time,title:r.title,note:r.note,
+  const row={id:r.id,date:r.date,time:r.time,title:r.title,note:r.note,photo:r.photo||null,
     before:r.before,repeat:r.repeat,repeat_until:r.repeatUntil,
     alert_ms:r.alertMs,event_ms:r.eventMs,fired:r.fired,
     sound:r.sound,repeat_count:r.repeatCount,priority:r.priority};
@@ -1340,8 +1380,13 @@ function renderCalResults(){
     return `<div style="background:${prioColor[p]};border:.5px solid ${prioBorder[p]};border-radius:var(--r);padding:1rem 1.1rem;margin-bottom:10px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="flex:1;min-width:0">
-          <div style="font-size:20px;font-weight:700">${esc(r.title)}</div>
-          <div style="font-size:13px;color:var(--muted);margin-top:2px">${dayName}, ${item.displayDate.split('-').reverse().join('.')} ${r.time} &nbsp;·&nbsp; ${dm.icon} ${dm.label}</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            ${r.photo?`<img src="${r.photo}" style="width:44px;height:44px;object-fit:cover;border-radius:50%;border:2px solid var(--border);flex-shrink:0">`:''}
+            <div>
+              <div style="font-size:20px;font-weight:700">${esc(r.title)}</div>
+              <div style="font-size:13px;color:var(--muted);margin-top:2px">${dayName}, ${item.displayDate.split('-').reverse().join('.')} ${r.time} &nbsp;·&nbsp; ${dm.icon} ${dm.label}</div>
+            </div>
+          </div>
           ${r.note?`<div style="font-size:13px;color:var(--muted);margin-top:5px;white-space:pre-wrap">${esc(r.note)}</div>`:''}
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
@@ -1355,6 +1400,69 @@ function renderCalResults(){
 document.getElementById('cal-ov').addEventListener('click',function(e){
   if(e.target===this) closeCalModal();
 });
+
+
+// ─── Photo helpers ────────────────────────────────────────────────────────────
+function compressPhoto(file, maxSize, callback){
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const img=new Image();
+    img.onload=function(){
+      const canvas=document.createElement('canvas');
+      let w=img.width, h=img.height;
+      // Scale down so longest side <= maxSize
+      if(w>maxSize||h>maxSize){
+        if(w>h){h=Math.round(h*maxSize/w);w=maxSize;}
+        else{w=Math.round(w*maxSize/h);h=maxSize;}
+      }
+      canvas.width=w; canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      // Try quality 0.75 first, if still >200KB reduce more
+      let dataUrl=canvas.toDataURL('image/jpeg',0.75);
+      if(dataUrl.length>270000) dataUrl=canvas.toDataURL('image/jpeg',0.5);
+      if(dataUrl.length>270000) dataUrl=canvas.toDataURL('image/jpeg',0.35);
+      callback(dataUrl);
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleInpPhoto(input){
+  const file=input.files[0];
+  if(!file) return;
+  compressPhoto(file, 600, function(dataUrl){
+    window._inpPhoto=dataUrl;
+    document.getElementById('inp-photo-img').src=dataUrl;
+    document.getElementById('inp-photo-preview').style.display='block';
+  });
+  input.value='';
+}
+
+function clearInpPhoto(){
+  window._inpPhoto=null;
+  document.getElementById('inp-photo-preview').style.display='none';
+  document.getElementById('inp-photo-img').src='';
+  document.getElementById('inp-photo-file').value='';
+}
+
+function handleEditPhoto(input){
+  const file=input.files[0];
+  if(!file) return;
+  compressPhoto(file, 600, function(dataUrl){
+    window._editPhoto=dataUrl;
+    document.getElementById('edit-photo-img').src=dataUrl;
+    document.getElementById('edit-photo-preview').style.display='block';
+  });
+  input.value='';
+}
+
+function clearEditPhoto(){
+  window._editPhoto=null;
+  document.getElementById('edit-photo-preview').style.display='none';
+  document.getElementById('edit-photo-img').src='';
+  document.getElementById('edit-photo-file').value='';
+}
 
 </script>
 
