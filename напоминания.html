@@ -971,7 +971,17 @@ async function processQueue(){
 function doSnooze(){
   if(currentAlarmId!==null){
     const r=reminders.find(x=>x.id===currentAlarmId);
-    if(r){r.alertMs=Date.now()+pickedSnooze*60000;r.fired=false;dbUpdate(r);}
+    if(r){
+      const newMs=Date.now()+pickedSnooze*60000;
+      r.alertMs=newMs;
+      r.eventMs=newMs;
+      const pad=n=>String(n).padStart(2,'0');
+      const nd=new Date(newMs);
+      r.date=`${nd.getFullYear()}-${pad(nd.getMonth()+1)}-${pad(nd.getDate())}`;
+      r.time=`${pad(nd.getHours())}:${pad(nd.getMinutes())}`;
+      r.fired=false;
+      dbUpdate(r);
+    }
   }
   closealarm();
 }
@@ -1097,7 +1107,7 @@ function render(){
       // Все повторяющиеся — показываем только в пределах 7 дней
       return r.eventMs <= in7days;
     }
-    return r.eventMs>=now7 && r.eventMs<=in7days;
+    return (r.eventMs>=now7 && r.eventMs<=in7days) || (!r.fired && r.alertMs>now7);
   });
   if(!visibleReminders.length){list.innerHTML='<div class="empty">В ближайшие 7 дней напоминаний нет</div>';return;}
   list.innerHTML=visibleReminders.map(r=>{
