@@ -952,11 +952,9 @@ async function processQueue(){
   if(bellInterval){clearInterval(bellInterval);bellInterval=null;}
   const isCustom=!!customTracks.find(x=>x.id===r.sound)||
     !!EMBEDDED_TRACKS.find(x=>x.id===r.sound);
+  stopAlarmAudio();
   if(isCustom){
-    // Кастомный/встроенный трек — играем один раз с loop, не перезапускаем
-    if(!alarmAudio||alarmAudio.paused||alarmAudio.ended){
-      await playSound(r.sound,true);
-    }
+    await playSound(r.sound,true);
   } else {
     if(r.sound!=='silent'){
       playSound(r.sound,false);
