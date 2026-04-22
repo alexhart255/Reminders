@@ -1397,7 +1397,10 @@ function renderCalResults(){
           <div style="display:flex;align-items:center;gap:10px">
             ${r.photo?`<img src="${r.photo}" class="photo-thumb" onclick="event.stopPropagation();openLightbox('${r.photo}')" style="width:44px;height:44px;object-fit:cover;border-radius:50%;border:2px solid var(--border);flex-shrink:0">`:''}
             <div>
-              <div style="font-size:20px;font-weight:700">${esc(r.title)}</div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <span style="font-size:20px;font-weight:700">${esc(r.title)}</span>
+                ${(r.fired || new Date(r.eventMs) < Date.now()) ? `<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:rgba(255,210,0,.15);color:#FFD700;border:.5px solid #FFD700;white-space:nowrap">✓ Выполнено</span>` : ''}
+              </div>
               <div style="font-size:13px;color:var(--muted);margin-top:2px">${dayName}, ${item.displayDate.split('-').reverse().join('.')} ${r.time} &nbsp;·&nbsp; ${dm.icon} ${dm.label}</div>
             </div>
           </div>
