@@ -1105,7 +1105,7 @@ function render(){
       // Все повторяющиеся — показываем только в пределах 7 дней
       return r.eventMs <= in7days;
     }
-    return (r.eventMs>=now7 && r.eventMs<=in7days) || (!r.fired && r.alertMs>now7);
+    return (r.eventMs>=now7 && r.eventMs<=in7days) || (!r.fired && r.alertMs>now7 && r.alertMs<=in7days);
   });
   if(!visibleReminders.length){list.innerHTML='<div class="empty">В ближайшие 7 дней напоминаний нет</div>';return;}
   list.innerHTML=visibleReminders.map(r=>{
