@@ -128,6 +128,12 @@
   .edit-sound-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
   .edit-sound-pill{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border:.5px solid var(--border);border-radius:20px;background:var(--bg);cursor:pointer;font-family:inherit;font-size:13px;font-weight:500;color:var(--text);transition:border-color .15s,background .15s}
   .edit-sound-pill.active{border-color:var(--accent);background:var(--blue-bg);color:var(--blue-t)}
+  /* Lightbox */
+  #lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out}
+  #lightbox.show{display:flex}
+  #lightbox img{max-width:90vw;max-height:90vh;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,.6);object-fit:contain}
+  .photo-thumb{cursor:zoom-in;transition:transform .15s}
+  .photo-thumb:hover{transform:scale(1.07)}
   .edit-sound-dd{display:none;border:.5px solid var(--border);border-radius:var(--r);padding:10px;display:none;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
   .edit-sound-dd.open{display:grid}
   @media(max-width:400px){.edit-sound-dd{grid-template-columns:repeat(3,1fr)}}
@@ -260,7 +266,7 @@
 
 <div id="ov">
   <div class="abox">
-    <div id="alarm-photo-wrap" style="display:none;margin-bottom:12px"><img id="alarm-photo-img" style="width:100px;height:100px;object-fit:cover;border-radius:50%;border:3px solid var(--accent);margin:0 auto;display:block"></div>
+    <div id="alarm-photo-wrap" style="display:none;margin-bottom:12px"><img id="alarm-photo-img" class="photo-thumb" onclick="openLightbox(this.src)" style="width:100px;height:100px;object-fit:cover;border-radius:50%;border:3px solid var(--accent);margin:0 auto;display:block"></div>
     <span class="aemoji" id="aemoji">🔔</span>
     <div class="atitle" id="atitle"></div>
     <div class="ameta"  id="ameta"></div>
@@ -1106,7 +1112,7 @@ function render(){
         <div class="ri-main">
           <div class="ri-left">
             <div style="display:flex;align-items:center;gap:10px">
-              ${r.photo?`<img src="${r.photo}" style="width:44px;height:44px;object-fit:cover;border-radius:50%;border:2px solid var(--border);flex-shrink:0">`:''}
+              ${r.photo?`<img src="${r.photo}" class="photo-thumb" onclick="event.stopPropagation();openLightbox('${r.photo}')" style="width:44px;height:44px;object-fit:cover;border-radius:50%;border:2px solid var(--border);flex-shrink:0">`:''}
               <div>
                 <div class="ri-title" style="${prioStyle}">${esc(r.title)}</div>
                 <div class="ri-date" style="${prioStyle}">${fmtDT(r.date,r.time)}</div>
@@ -1381,7 +1387,7 @@ function renderCalResults(){
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:10px">
-            ${r.photo?`<img src="${r.photo}" style="width:44px;height:44px;object-fit:cover;border-radius:50%;border:2px solid var(--border);flex-shrink:0">`:''}
+            ${r.photo?`<img src="${r.photo}" class="photo-thumb" onclick="event.stopPropagation();openLightbox('${r.photo}')" style="width:44px;height:44px;object-fit:cover;border-radius:50%;border:2px solid var(--border);flex-shrink:0">`:''}
             <div>
               <div style="font-size:20px;font-weight:700">${esc(r.title)}</div>
               <div style="font-size:13px;color:var(--muted);margin-top:2px">${dayName}, ${item.displayDate.split('-').reverse().join('.')} ${r.time} &nbsp;·&nbsp; ${dm.icon} ${dm.label}</div>
@@ -1464,6 +1470,18 @@ function clearEditPhoto(){
   document.getElementById('edit-photo-file').value='';
 }
 
+
+// ─── Lightbox ─────────────────────────────────────────────────────────────────
+function openLightbox(src){
+  document.getElementById('lightbox-img').src=src;
+  document.getElementById('lightbox').classList.add('show');
+}
+function closeLightbox(){
+  document.getElementById('lightbox').classList.remove('show');
+  document.getElementById('lightbox-img').src='';
+}
+document.addEventListener('keydown',function(e){if(e.key==='Escape') closeLightbox();});
+
 </script>
 
 <!-- Calendar Modal -->
@@ -1495,5 +1513,8 @@ function clearEditPhoto(){
   </div>
 </div>
 
+<div id="lightbox" onclick="closeLightbox()">
+  <img id="lightbox-img" src="" alt="">
+</div>
 </body>
 </html>
