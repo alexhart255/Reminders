@@ -137,11 +137,26 @@
   .edit-sound-dd{display:none;border:.5px solid var(--border);border-radius:var(--r);padding:10px;display:none;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
   .edit-sound-dd.open{display:grid}
   @media(max-width:400px){.edit-sound-dd{grid-template-columns:repeat(3,1fr)}}
+  /* Excel Calendar Modal */
+  #xcal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1200;align-items:center;justify-content:center;padding:1rem}
+  #xcal-ov.show{display:flex}
+  .xcal-box{background:var(--surface);border-radius:var(--r);padding:1.5rem;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;border:.5px solid var(--border)}
+  .xcal-box h2{font-size:17px;font-weight:600;margin-bottom:1rem}
+  .xcal-upload-zone{border:.5px dashed var(--border-h);border-radius:var(--rs);padding:20px 16px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;font-size:14px;color:var(--muted);margin-bottom:1rem}
+  .xcal-upload-zone:hover{border-color:var(--accent);background:var(--blue-bg);color:var(--blue-t)}
+  .xcal-upload-zone.loading{border-color:var(--amber-b);background:var(--amber-bg);color:var(--amber-t);cursor:default}
+  .xcal-upload-zone.ok{border-style:solid;border-color:var(--green-b);background:var(--green-bg);color:var(--green-t)}
+  .xcal-file-card{background:var(--bg);border:.5px solid var(--border);border-radius:var(--rs);padding:14px 16px;display:flex;align-items:center;gap:12px;margin-bottom:1rem}
+  .xcal-file-info{flex:1;min-width:0}
+  .xcal-file-name{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .xcal-file-meta{font-size:12px;color:var(--muted);margin-top:2px}
+  .xcal-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .xcal-hint{font-size:12px;color:var(--muted);text-align:center;margin-top:.5rem}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>🔔 Напоминания <span style="margin-left:auto;display:flex;gap:8px;align-items:center"><button class="btn" style="font-size:13px;padding:6px 14px" onclick="openCalModal()">📅 По месяцам</button><button class="btn" style="font-size:13px;padding:6px 14px;background:var(--green-bg);color:var(--green-t);border-color:var(--green-b)" onclick="document.getElementById('xlsx-file-input').click()">📊 Загрузить Excel</button><input type="file" id="xlsx-file-input" accept=".xlsx,.xls" style="display:none" onchange="handleXlsxUpload(this)"></span></h1>
+  <h1>🔔 Напоминания <button class="btn" style="margin-left:auto;font-size:13px;padding:6px 14px" onclick="openCalModal()">📅 По месяцам</button> <button class="btn" style="font-size:13px;padding:6px 14px" onclick="openXCalModal()">📊 Календарь</button></h1>
   <div class="card">
     <div class="fg">
       <div class="field"><label>Дата</label><input type="date" id="inp-date"></div>
@@ -1493,6 +1508,123 @@ function closeLightbox(){
 }
 document.addEventListener('keydown',function(e){if(e.key==='Escape') closeLightbox();});
 
+// ─── Excel Calendar (Supabase Storage) ───────────────────────────────────────
+const XCAL_BUCKET = 'calendar';
+const XCAL_FILE_PATH = 'kalender.xlsx';
+
+async function xcalGetFileInfo() {
+  try {
+    const r = await fetch(
+      SUPA_URL + '/storage/v1/object/info/public/' + XCAL_BUCKET + '/' + XCAL_FILE_PATH,
+      { headers: SUPA_HEADERS }
+    );
+    if (!r.ok) return null;
+    return await r.json();
+  } catch(e) { return null; }
+}
+
+async function xcalUpload(file) {
+  const zone = document.getElementById('xcal-upload-zone');
+  zone.className = 'xcal-upload-zone loading';
+  zone.innerHTML = '⏳ Загружаю файл...';
+  try {
+    // Удаляем старый файл если есть
+    await fetch(
+      SUPA_URL + '/storage/v1/object/' + XCAL_BUCKET + '/' + XCAL_FILE_PATH,
+      { method: 'DELETE', headers: SUPA_HEADERS }
+    );
+    // Загружаем новый
+    const uploadHeaders = {
+      'apikey': SUPA_KEY,
+      'Authorization': 'Bearer ' + SUPA_KEY,
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'x-upsert': 'true'
+    };
+    const r = await fetch(
+      SUPA_URL + '/storage/v1/object/' + XCAL_BUCKET + '/' + XCAL_FILE_PATH,
+      { method: 'POST', headers: uploadHeaders, body: file }
+    );
+    if (!r.ok) {
+      const err = await r.text();
+      throw new Error(err);
+    }
+    zone.className = 'xcal-upload-zone ok';
+    zone.innerHTML = '✅ Файл успешно загружен!';
+    setTimeout(() => renderXCalModal(), 1500);
+  } catch(e) {
+    console.error('xcal upload error:', e);
+    zone.className = 'xcal-upload-zone';
+    zone.innerHTML = '❌ Ошибка загрузки: ' + e.message + '<br><small>Нажмите чтобы попробовать снова</small>';
+  }
+}
+
+async function xcalDelete() {
+  if (!confirm('Удалить файл календаря?')) return;
+  try {
+    await fetch(
+      SUPA_URL + '/storage/v1/object/' + XCAL_BUCKET + '/' + XCAL_FILE_PATH,
+      { method: 'DELETE', headers: SUPA_HEADERS }
+    );
+    renderXCalModal();
+  } catch(e) {
+    alert('Ошибка удаления: ' + e.message);
+  }
+}
+
+function xcalDownload() {
+  const url = SUPA_URL + '/storage/v1/object/public/' + XCAL_BUCKET + '/' + XCAL_FILE_PATH;
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'Kalender.xlsx';
+  a.click();
+}
+
+async function renderXCalModal() {
+  const body = document.getElementById('xcal-body');
+  body.innerHTML = '<div style="text-align:center;color:var(--muted);padding:1rem">⏳ Проверяю...</div>';
+  
+  const info = await xcalGetFileInfo();
+  
+  if (info) {
+    const size = info.size ? (info.size / 1024).toFixed(1) + ' КБ' : '';
+    const updated = info.updated_at ? new Date(info.updated_at).toLocaleString('ru-RU') : '';
+    body.innerHTML = `
+      <div class="xcal-file-card">
+        <span style="font-size:32px">📊</span>
+        <div class="xcal-file-info">
+          <div class="xcal-file-name">Kalender.xlsx</div>
+          <div class="xcal-file-meta">${size}${updated ? ' · обновлён ' + updated : ''}</div>
+        </div>
+      </div>
+      <div class="xcal-actions" style="margin-bottom:1rem">
+        <button class="btn btn-primary" onclick="xcalDownload()" style="font-size:13px;padding:7px 16px">⬇️ Открыть / Скачать</button>
+        <button class="btn" onclick="document.getElementById('xcal-file-input').click()" style="font-size:13px;padding:7px 16px">🔄 Заменить файл</button>
+        <button class="btn" onclick="xcalDelete()" style="font-size:13px;padding:7px 16px;color:var(--red-t);border-color:var(--red-b)">🗑️ Удалить</button>
+      </div>
+      <input type="file" id="xcal-file-input" accept=".xlsx,.xls" style="display:none" onchange="if(this.files[0]) xcalUpload(this.files[0]); this.value='';">
+      <div class="xcal-hint">Файл хранится в облаке и доступен на всех устройствах</div>`;
+  } else {
+    body.innerHTML = `
+      <div style="text-align:center;padding:1.5rem 0;color:var(--muted);font-size:14px;margin-bottom:1rem">
+        📂 Файл календаря ещё не загружен
+      </div>
+      <div class="xcal-upload-zone" id="xcal-upload-zone" onclick="document.getElementById('xcal-file-input').click()">
+        📊 Нажмите чтобы загрузить Excel файл (.xlsx)
+      </div>
+      <input type="file" id="xcal-file-input" accept=".xlsx,.xls" style="display:none" onchange="if(this.files[0]) xcalUpload(this.files[0]); this.value='';">
+      <div class="xcal-hint">После загрузки файл будет доступен на всех ваших устройствах</div>`;
+  }
+}
+
+function openXCalModal() {
+  document.getElementById('xcal-ov').classList.add('show');
+  renderXCalModal();
+}
+
+function closeXCalModal() {
+  document.getElementById('xcal-ov').classList.remove('show');
+}
+
 </script>
 
 <!-- Calendar Modal -->
@@ -1528,116 +1660,18 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape') closeLightb
   <img id="lightbox-img" src="" alt="">
 </div>
 
-<!-- Excel Viewer Modal -->
-<div id="xlsx-ov" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1200;align-items:center;justify-content:center;padding:1rem">
-  <div style="background:var(--surface);border-radius:var(--r);padding:1.5rem;width:96%;max-width:1000px;max-height:92vh;display:flex;flex-direction:column;border:.5px solid var(--border)">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem;flex-wrap:wrap">
-      <span style="font-size:18px">📊</span>
-      <span id="xlsx-filename" style="font-size:16px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-        <span style="font-size:13px;color:var(--muted)">Лист:</span>
-        <select id="xlsx-sheet-sel" onchange="renderXlsxSheet()" style="font-family:inherit;font-size:13px;background:var(--bg);color:var(--text);border:.5px solid var(--border);border-radius:var(--rs);padding:5px 8px"></select>
-        <button class="btn" onclick="closeXlsxModal()" style="padding:5px 12px;font-size:13px">✕ Закрыть</button>
-      </div>
+<!-- Excel Calendar Modal -->
+<div id="xcal-ov">
+  <div class="xcal-box">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.2rem">
+      <h2 style="flex:1;margin:0">📊 Мой календарь</h2>
+      <button class="btn" onclick="closeXCalModal()" style="padding:5px 12px;font-size:13px">✕ Закрыть</button>
     </div>
-    <div style="overflow:auto;flex:1;border:.5px solid var(--border);border-radius:var(--rs)">
-      <div id="xlsx-table-wrap" style="min-width:max-content"></div>
+    <div id="xcal-body">
+      <div style="text-align:center;color:var(--muted);padding:1rem">⏳ Загрузка...</div>
     </div>
-    <div id="xlsx-info" style="font-size:12px;color:var(--muted);margin-top:8px;text-align:right"></div>
   </div>
 </div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script>
-// ─── Excel Viewer ──────────────────────────────────────────────────────────────
-let _xlsxWorkbook = null;
-
-function handleXlsxUpload(input) {
-  const file = input.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    try {
-      _xlsxWorkbook = XLSX.read(e.target.result, { type: 'array', cellDates: true });
-      document.getElementById('xlsx-filename').textContent = file.name;
-      const sel = document.getElementById('xlsx-sheet-sel');
-      sel.innerHTML = '';
-      _xlsxWorkbook.SheetNames.forEach((name, i) => {
-        const opt = document.createElement('option');
-        opt.value = i;
-        opt.textContent = name;
-        sel.appendChild(opt);
-      });
-      renderXlsxSheet();
-      document.getElementById('xlsx-ov').style.display = 'flex';
-    } catch(err) {
-      alert('Ошибка чтения файла: ' + err.message);
-    }
-  };
-  reader.readAsArrayBuffer(file);
-  input.value = '';
-}
-
-function renderXlsxSheet() {
-  if (!_xlsxWorkbook) return;
-  const idx = parseInt(document.getElementById('xlsx-sheet-sel').value);
-  const sheetName = _xlsxWorkbook.SheetNames[idx];
-  const sheet = _xlsxWorkbook.Sheets[sheetName];
-  const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:A1');
-  const rows = [];
-  for (let r = range.s.r; r <= range.e.r; r++) {
-    const row = [];
-    for (let c = range.s.c; c <= range.e.c; c++) {
-      const addr = XLSX.utils.encode_cell({ r, c });
-      const cell = sheet[addr];
-      let val = '';
-      if (cell) {
-        if (cell.t === 'd') {
-          const d = cell.v;
-          val = d instanceof Date
-            ? (d.getFullYear() > 1901
-               ? d.toLocaleDateString('de-CH', { day:'2-digit', month:'2-digit', year:'numeric' })
-               : d.toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }))
-            : String(cell.v);
-        } else {
-          val = cell.w !== undefined ? cell.w : (cell.v !== undefined ? String(cell.v) : '');
-        }
-      }
-      row.push(val);
-    }
-    rows.push(row);
-  }
-
-  const totalCols = range.e.c - range.s.c + 1;
-  const totalRows = range.e.r - range.s.r + 1;
-
-  let html = '<table style="border-collapse:collapse;font-size:13px;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif">';
-  rows.forEach((row, ri) => {
-    const isHeader = ri === 0;
-    const bg = isHeader ? 'var(--blue-bg)' : (ri % 2 === 0 ? 'var(--surface)' : 'var(--bg)');
-    html += `<tr style="background:${bg}">`;
-    row.forEach(cell => {
-      const tag = isHeader ? 'th' : 'td';
-      const fw = isHeader ? '600' : '400';
-      const col = isHeader ? 'var(--blue-t)' : 'var(--text)';
-      html += `<${tag} style="border:.5px solid var(--border);padding:5px 10px;white-space:nowrap;font-weight:${fw};color:${col};max-width:260px;overflow:hidden;text-overflow:ellipsis" title="${cell.replace(/"/g,'&quot;')}">${cell || ''}</${tag}>`;
-    });
-    html += '</tr>';
-  });
-  html += '</table>';
-
-  document.getElementById('xlsx-table-wrap').innerHTML = html;
-  document.getElementById('xlsx-info').textContent = `${sheetName} · ${totalRows} строк × ${totalCols} столбцов`;
-}
-
-function closeXlsxModal() {
-  document.getElementById('xlsx-ov').style.display = 'none';
-}
-
-document.getElementById('xlsx-ov').addEventListener('click', function(e) {
-  if (e.target === this) closeXlsxModal();
-});
-</script>
 
 </body>
 </html>
