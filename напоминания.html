@@ -152,6 +152,19 @@
   .xcal-file-meta{font-size:12px;color:var(--muted);margin-top:2px}
   .xcal-actions{display:flex;gap:8px;flex-wrap:wrap}
   .xcal-hint{font-size:12px;color:var(--muted);text-align:center;margin-top:.5rem}
+  /* Excel preview */
+  .xcal-box{max-width:900px!important}
+  .xcal-preview{margin-top:1rem}
+  .xcal-sheet-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+  .xcal-tab{font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;padding:5px 12px;border:.5px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;background:var(--bg);color:var(--muted);transition:background .15s,color .15s;border-bottom:none}
+  .xcal-tab.active{background:var(--surface);color:var(--text);border-color:var(--accent);border-bottom-color:var(--surface)}
+  .xcal-table-wrap{overflow:auto;max-height:420px;border:.5px solid var(--border);border-radius:0 var(--rs) var(--rs) var(--rs)}
+  .xcal-table{border-collapse:collapse;font-size:12px;white-space:nowrap;min-width:100%}
+  .xcal-table th{background:var(--bg);font-weight:600;color:var(--muted);padding:6px 10px;border:.5px solid var(--border);position:sticky;top:0;z-index:1;font-size:11px}
+  .xcal-table td{padding:5px 10px;border:.5px solid var(--border);color:var(--text);max-width:220px;overflow:hidden;text-overflow:ellipsis}
+  .xcal-table tr:nth-child(even) td{background:rgba(0,0,0,.02)}
+  @media(prefers-color-scheme:dark){.xcal-table tr:nth-child(even) td{background:rgba(255,255,255,.03)}}
+  .xcal-preview-loading{text-align:center;padding:1.5rem;color:var(--muted);font-size:13px}
 </style>
 </head>
 <body>
@@ -431,6 +444,7 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 // ─── Built-in sounds ─────────────────────────────────────────────────────────
 const BUILTINS=[
@@ -1557,6 +1571,113 @@ async function xcalUpload(file) {
   }
 }
 
+async function xcalPreview() {
+  const previewEl = document.getElementById('xcal-preview-area');
+  if (!previewEl) return;
+  previewEl.innerHTML = '<div class="xcal-preview-loading">⏳ Загружаю таблицу...</div>';
+  previewEl.style.display = 'block';
+  try {
+    const url = SUPA_URL + '/storage/v1/object/public/' + XCAL_BUCKET + '/' + XCAL_FILE_PATH;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('Не удалось загрузить файл');
+    const arrayBuffer = await resp.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true, cellStyles: true });
+    window._xcalWorkbook = workbook;
+    window._xcalActiveSheet = workbook.SheetNames[0];
+    renderXCalTable(previewEl);
+  } catch(e) {
+    previewEl.innerHTML = '<div class="xcal-preview-loading" style="color:var(--red-t)">❌ Ошибка: ' + e.message + '</div>';
+  }
+}
+
+function xcalGetCellStyle(ws, col, row) {
+  const addr = XLSX.utils.encode_cell({ c: col, r: row });
+  const cell = ws[addr];
+  if (!cell || !cell.s) return '';
+  let style = '';
+  // Background fill
+  const fill = cell.s.fgColor || (cell.s.fill && cell.s.fill.fgColor);
+  if (fill) {
+    let rgb = fill.rgb;
+    if (!rgb && fill.theme !== undefined) rgb = null; // theme colors harder to resolve
+    if (rgb && rgb !== 'FFFFFFFF' && rgb !== 'FF000000' && rgb.length >= 6) {
+      // ARGB → RGB (strip alpha)
+      const hex = rgb.length === 8 ? rgb.slice(2) : rgb;
+      style += `background:#${hex};`;
+    }
+  }
+  // Font color
+  const font = cell.s.color || (cell.s.font && cell.s.font.color);
+  if (font && font.rgb) {
+    const hex = font.rgb.length === 8 ? font.rgb.slice(2) : font.rgb;
+    if (hex && hex !== '000000' && hex !== 'FF000000') {
+      style += `color:#${hex};`;
+    }
+  }
+  // Bold
+  if (cell.s.bold || (cell.s.font && cell.s.font.bold)) {
+    style += 'font-weight:600;';
+  }
+  return style;
+}
+
+function renderXCalTable(container) {
+  const wb = window._xcalWorkbook;
+  if (!wb) return;
+  const sheetName = window._xcalActiveSheet;
+  const ws = wb.Sheets[sheetName];
+  const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', cellDates: true });
+
+  // Tabs
+  let tabsHtml = '<div class="xcal-sheet-tabs">';
+  wb.SheetNames.forEach(name => {
+    const active = name === sheetName ? ' active' : '';
+    tabsHtml += `<button class="xcal-tab${active}" onclick="window._xcalActiveSheet='${name.replace(/'/g,"\\'")}';renderXCalTable(document.getElementById('xcal-preview-area'))">${name}</button>`;
+  });
+  tabsHtml += '</div>';
+
+  if (!data.length) {
+    container.innerHTML = tabsHtml + '<div class="xcal-preview-loading">Лист пустой</div>';
+    return;
+  }
+
+  // Get sheet range to know actual column count
+  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+  const numCols = range.e.c - range.s.c + 1;
+  const colIndices = Array.from({ length: numCols }, (_, i) => i);
+
+  let tableHtml = '<div class="xcal-table-wrap"><table class="xcal-table"><thead><tr>';
+  // Header row (row index 0 in data = sheet row range.s.r)
+  colIndices.forEach(ci => {
+    const addr = XLSX.utils.encode_cell({ c: range.s.c + ci, r: range.s.r });
+    const cell = ws[addr];
+    const val = cell ? (cell.v !== undefined ? cell.v : '') : '';
+    const st = xcalGetCellStyle(ws, range.s.c + ci, range.s.r);
+    tableHtml += `<th style="${st}">${val !== '' ? val : '&nbsp;'}</th>`;
+  });
+  tableHtml += '</tr></thead><tbody>';
+
+  for (let ri = 1; ri < data.length; ri++) {
+    const row = data[ri];
+    if (row.every(c => c === '' || c === null || c === undefined)) continue;
+    tableHtml += '<tr>';
+    colIndices.forEach(ci => {
+      const sheetRow = range.s.r + ri;
+      const sheetCol = range.s.c + ci;
+      const addr = XLSX.utils.encode_cell({ c: sheetCol, r: sheetRow });
+      const cell = ws[addr];
+      let val = cell ? (cell.v !== undefined ? cell.v : '') : '';
+      if (val instanceof Date) val = val.toLocaleDateString('ru-RU');
+      const st = xcalGetCellStyle(ws, sheetCol, sheetRow);
+      tableHtml += `<td style="${st}" title="${String(val).replace(/"/g,'&quot;')}">${val !== '' ? val : '&nbsp;'}</td>`;
+    });
+    tableHtml += '</tr>';
+  }
+  tableHtml += '</tbody></table></div>';
+  container.innerHTML = tabsHtml + tableHtml;
+}
+
+
 async function xcalDelete() {
   if (!confirm('Удалить файл календаря?')) return;
   try {
@@ -1596,11 +1717,13 @@ async function renderXCalModal() {
         </div>
       </div>
       <div class="xcal-actions" style="margin-bottom:1rem">
-        <button class="btn btn-primary" onclick="xcalDownload()" style="font-size:13px;padding:7px 16px">⬇️ Открыть / Скачать</button>
+        <button class="btn btn-primary" onclick="xcalPreview()" style="font-size:13px;padding:7px 16px">👁️ Просмотр таблицы</button>
+        <button class="btn" onclick="xcalDownload()" style="font-size:13px;padding:7px 16px">⬇️ Скачать</button>
         <button class="btn" onclick="document.getElementById('xcal-file-input').click()" style="font-size:13px;padding:7px 16px">🔄 Заменить файл</button>
         <button class="btn" onclick="xcalDelete()" style="font-size:13px;padding:7px 16px;color:var(--red-t);border-color:var(--red-b)">🗑️ Удалить</button>
       </div>
       <input type="file" id="xcal-file-input" accept=".xlsx,.xls" style="display:none" onchange="if(this.files[0]) xcalUpload(this.files[0]); this.value='';">
+      <div id="xcal-preview-area" style="display:none" class="xcal-preview"></div>
       <div class="xcal-hint">Файл хранится в облаке и доступен на всех устройствах</div>`;
   } else {
     body.innerHTML = `
