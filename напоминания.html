@@ -1619,13 +1619,22 @@ function xcalGetCellStyle(ws, col, row) {
   const cell = ws[addr];
   if (!cell || !cell.s) return '';
   let style = '';
-  // Background fill
-  const fill = cell.s.fgColor || (cell.s.fill && cell.s.fill.fgColor);
-  if (fill) {
-    let rgb = fill.rgb;
-    if (!rgb && fill.theme !== undefined) rgb = null; // theme colors harder to resolve
-    if (rgb && rgb !== 'FFFFFFFF' && rgb !== 'FF000000' && rgb.length >= 6) {
-      // ARGB → RGB (strip alpha)
+  // Background fill — в Excel для solid fill фоновый цвет хранится в fgColor (так работает SheetJS)
+  // Но нужно отфильтровать "пустые" цвета: белый, прозрачный, авто-индекс 64
+  const s = cell.s;
+  const fillColor = s.fgColor || (s.fill && s.fill.fgColor);
+  const patternType = s.patternType || (s.fill && s.fill.patternType) || '';
+  let applyFill = false;
+  if (fillColor && patternType !== 'none' && patternType !== '') {
+    // indexed:64 = "automatic/transparent" — пропускаем
+    if (fillColor.indexed !== undefined && fillColor.indexed !== 64) applyFill = true;
+    if (fillColor.rgb) applyFill = true;
+    if (fillColor.theme !== undefined) applyFill = false; // theme цвета не применяем — они требуют palette
+  }
+  if (applyFill && fillColor.rgb) {
+    const rgb = fillColor.rgb;
+    // Пропускаем белый и чёрный (дефолты)
+    if (rgb !== 'FFFFFFFF' && rgb !== 'FF000000' && rgb !== '00000000' && rgb !== 'FFFFFF' && rgb.length >= 6) {
       const hex = rgb.length === 8 ? rgb.slice(2) : rgb;
       style += `background:#${hex};`;
     }
@@ -1636,6 +1645,13 @@ function xcalGetCellStyle(ws, col, row) {
     const hex = font.rgb.length === 8 ? font.rgb.slice(2) : font.rgb;
     if (hex && hex !== '000000' && hex !== 'FF000000') {
       style += `color:#${hex};`;
+    }
+  }
+  // Если есть цветной фон — принудительно тёмный текст (чтобы читалось на светлых цветах)
+  if (applyFill && fillColor && fillColor.rgb) {
+    const rgb = fillColor.rgb;
+    if (rgb !== 'FFFFFFFF' && rgb !== 'FF000000' && rgb !== '00000000' && rgb.length >= 6) {
+      style += `color:#1a1a1a;`;
     }
   }
   // Bold
@@ -1682,17 +1698,46 @@ function renderXCalTable(container) {
   tableHtml += '</tr></thead><tbody>';
 
   for (let ri = 1; ri < data.length; ri++) {
+    const sheetRow = range.s.r + ri;
+
+    // Цвета которые растягиваются на всю строку (суббота, воскресенье, разделитель месяца)
+    const ROW_COLORS = new Set(['DAE9F8','C1F0C8','F7C7AC']);
+
+    // Определяем "цвет строки" — только для разрешённых пастельных цветов
+    let rowBgStyle = '';
+    for (let ci = 0; ci < numCols; ci++) {
+      const addr = XLSX.utils.encode_cell({ c: range.s.c + ci, r: sheetRow });
+      const cell = ws[addr];
+      if (cell && cell.s) {
+        const s = cell.s;
+        const fc = s.fgColor || (s.fill && s.fill.fgColor);
+        const pt = s.patternType || (s.fill && s.fill.patternType) || '';
+        if (fc && fc.rgb && pt !== 'none' && pt !== '') {
+          const rgb = fc.rgb;
+          const hex = (rgb.length === 8 ? rgb.slice(2) : rgb).toUpperCase();
+          if (ROW_COLORS.has(hex)) {
+            rowBgStyle = `background:#${hex};color:#1a1a1a;`;
+            break;
+          }
+        }
+      }
+    }
+
+    // Пропускаем строку только если она полностью пустая И без цвета
     const row = data[ri];
-    if (row.every(c => c === '' || c === null || c === undefined)) continue;
+    const hasData = row.some(c => c !== '' && c !== null && c !== undefined);
+    if (!hasData && !rowBgStyle) continue;
+
     tableHtml += '<tr>';
     colIndices.forEach(ci => {
-      const sheetRow = range.s.r + ri;
       const sheetCol = range.s.c + ci;
       const addr = XLSX.utils.encode_cell({ c: sheetCol, r: sheetRow });
       const cell = ws[addr];
       let val = cell ? (cell.v !== undefined ? cell.v : '') : '';
       if (val instanceof Date) val = val.toLocaleDateString('ru-RU');
-      const st = xcalGetCellStyle(ws, sheetCol, sheetRow);
+      // Берём индивидуальный стиль ячейки, если нет — используем стиль строки
+      const cellSt = xcalGetCellStyle(ws, sheetCol, sheetRow);
+      const st = cellSt || rowBgStyle;
       tableHtml += `<td style="${st}" title="${String(val).replace(/"/g,'&quot;')}">${val !== '' ? val : '&nbsp;'}</td>`;
     });
     tableHtml += '</tr>';
