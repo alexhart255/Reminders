@@ -1527,24 +1527,48 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape') closeLightb
 // ─── Excel Calendar (Supabase Storage) ───────────────────────────────────────
 async function xcalGetFileInfo() {
   try {
+    // LIST API — возвращает актуальное состояние, не кешируется CDN
     const r = await fetch(
-      SUPA_URL + '/storage/v1/object/info/public/' + XCAL_BUCKET + '/' + XCAL_FILE_PATH,
-      { headers: SUPA_HEADERS }
+      SUPA_URL + '/storage/v1/object/list/' + XCAL_BUCKET,
+      {
+        method: 'POST',
+        headers: {
+          'apikey': SUPA_KEY,
+          'Authorization': 'Bearer ' + SUPA_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ prefix: '', search: XCAL_FILE_PATH, limit: 10 })
+      }
     );
     if (!r.ok) return null;
-    return await r.json();
+    const list = await r.json();
+    if (!Array.isArray(list) || list.length === 0) return null;
+    const found = list.find(f => f.name === XCAL_FILE_PATH);
+    if (!found) return null;
+    return {
+      size: found.metadata?.size ?? found.metadata?.contentLength ?? 0,
+      updated_at: found.updated_at || found.created_at
+    };
   } catch(e) { return null; }
 }
 
 async function xcalUpload(file) {
+  const body = document.getElementById('xcal-body');
   const zone = document.getElementById('xcal-upload-zone');
-  zone.className = 'xcal-upload-zone loading';
-  zone.innerHTML = '⏳ Загружаю файл...';
+  // Показываем прогресс — либо в зоне загрузки, либо в body если файл уже был
+  const showStatus = (html) => {
+    if (zone) { zone.className = 'xcal-upload-zone loading'; zone.innerHTML = html; }
+    else { body.innerHTML = '<div style="text-align:center;color:var(--muted);padding:1rem">' + html + '</div>'; }
+  };
+  showStatus('⏳ Загружаю файл...');
   try {
     // Удаляем старый файл если есть
     await fetch(
       SUPA_URL + '/storage/v1/object/' + XCAL_BUCKET + '/' + XCAL_FILE_PATH,
-      { method: 'DELETE', headers: SUPA_HEADERS }
+      {
+        method: 'DELETE',
+        headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY }
+      }
     );
     // Загружаем новый
     const uploadHeaders = {
@@ -1561,13 +1585,13 @@ async function xcalUpload(file) {
       const err = await r.text();
       throw new Error(err);
     }
-    zone.className = 'xcal-upload-zone ok';
-    zone.innerHTML = '✅ Файл успешно загружен!';
+    if (zone) { zone.className = 'xcal-upload-zone ok'; zone.innerHTML = '✅ Файл успешно загружен!'; }
+    else { body.innerHTML = '<div style="text-align:center;color:var(--green-t);padding:1rem">✅ Файл успешно загружен!</div>'; }
     setTimeout(() => renderXCalModal(), 1500);
   } catch(e) {
     console.error('xcal upload error:', e);
-    zone.className = 'xcal-upload-zone';
-    zone.innerHTML = '❌ Ошибка загрузки: ' + e.message + '<br><small>Нажмите чтобы попробовать снова</small>';
+    if (zone) { zone.className = 'xcal-upload-zone'; zone.innerHTML = '❌ Ошибка загрузки: ' + e.message + '<br><small>Нажмите чтобы попробовать снова</small>'; }
+    else { body.innerHTML = '<div style="text-align:center;color:var(--red-t);padding:1rem">❌ Ошибка загрузки: ' + e.message + '</div>'; }
   }
 }
 
@@ -1680,14 +1704,29 @@ function renderXCalTable(container) {
 
 async function xcalDelete() {
   if (!confirm('Удалить файл календаря?')) return;
+  const body = document.getElementById('xcal-body');
+  body.innerHTML = '<div style="text-align:center;color:var(--muted);padding:1rem">⏳ Удаляю...</div>';
   try {
-    await fetch(
+    const r = await fetch(
       SUPA_URL + '/storage/v1/object/' + XCAL_BUCKET + '/' + XCAL_FILE_PATH,
-      { method: 'DELETE', headers: SUPA_HEADERS }
+      {
+        method: 'DELETE',
+        headers: {
+          'apikey': SUPA_KEY,
+          'Authorization': 'Bearer ' + SUPA_KEY
+          // Content-Type намеренно не указан — DELETE не имеет body
+        }
+      }
     );
+    if (!r.ok) {
+      const errText = await r.text().catch(() => '');
+      throw new Error('HTTP ' + r.status + (errText ? ': ' + errText : ''));
+    }
+    await new Promise(res => setTimeout(res, 500));
     renderXCalModal();
   } catch(e) {
     alert('Ошибка удаления: ' + e.message);
+    renderXCalModal();
   }
 }
 
