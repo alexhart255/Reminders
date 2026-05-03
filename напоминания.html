@@ -587,7 +587,8 @@ async function dbLoad(){
       before:x.before||0,repeat:x.repeat||0,repeatUntil:x.repeat_until||0,
       alertMs:x.alert_ms,eventMs:x.event_ms,fired:x.fired||false,
       sound:x.sound||'silent',repeatCount:x.repeat_count||0,photo:x.photo||null,
-      priority:x.priority||'none'
+      priority:x.priority||'none',
+      completedOccurrences:x.completed_occurrences?JSON.parse(x.completed_occurrences):[]
     }));
     // Для просроченных повторяющихся — пересчитываем дату на следующую
     const nowMs = Date.now();
@@ -596,8 +597,19 @@ async function dbLoad(){
     reminders.forEach(r=>{
       if(r.repeat && r.repeat>0 && !r.fired && r.eventMs < nowMs) {
         let nextMs = r.eventMs;
-        // Прокручиваем вперёд пока не окажемся в будущем
+        let curMs = r.eventMs;
+        // Прокручиваем вперёд пока не окажемся в будущем, сохраняя пропущенные вхождения
         while(nextMs < nowMs) {
+          // Сохраняем пропущенное вхождение в историю выполненных
+          const occD = new Date(curMs);
+          const occDate = `${occD.getFullYear()}-${padL(occD.getMonth()+1)}-${padL(occD.getDate())}`;
+          const occTime = `${padL(occD.getHours())}:${padL(occD.getMinutes())}`;
+          if(!r.completedOccurrences) r.completedOccurrences = [];
+          // Добавляем только если ещё нет такой записи
+          if(!r.completedOccurrences.find(o=>o.eventMs===curMs)){
+            r.completedOccurrences.push({date:occDate,time:occTime,eventMs:curMs});
+          }
+          curMs = nextMs;
           if(r.repeat === 43200) {
             const nd = new Date(nextMs); nd.setMonth(nd.getMonth()+1); nextMs = nd.getTime();
           } else if(r.repeat === 525600) {
@@ -637,7 +649,8 @@ async function dbSave(r){
 
 async function dbUpdate(r){
   const row={fired:r.fired,alert_ms:r.alertMs,event_ms:r.eventMs,
-    date:r.date,time:r.time,repeat_count:r.repeatCount||0,priority:r.priority||'none',photo:r.photo||null};
+    date:r.date,time:r.time,repeat_count:r.repeatCount||0,priority:r.priority||'none',photo:r.photo||null,
+    completed_occurrences:r.completedOccurrences?JSON.stringify(r.completedOccurrences):null};
   try{
     await fetch(SUPA_URL+'/rest/v1/Reminders?id=eq.'+r.id,{
       method:'PATCH',headers:SUPA_HEADERS,body:JSON.stringify(row)
@@ -1024,6 +1037,10 @@ function dismissCurrent(){
         r.repeatCount = (r.repeatCount||0) + 1;
         const maxRepeats = r.repeatUntil || 0;
         if(maxRepeats === 0 || r.repeatCount < maxRepeats){
+          // ── Сохраняем текущее вхождение в историю выполненных ──
+          if(!r.completedOccurrences) r.completedOccurrences = [];
+          r.completedOccurrences.push({ date: r.date, time: r.time, eventMs: r.eventMs });
+
           let nextMs;
           const pad = n => String(n).padStart(2,'0');
           if(r.repeat === 43200) {
@@ -1365,6 +1382,17 @@ function renderCalResults(){
   const items=[];
   reminders.forEach(r=>{
     if(!r.date) return;
+
+    // ── Показываем сохранённые выполненные вхождения за этот месяц/год ──
+    if(r.completedOccurrences && r.completedOccurrences.length){
+      r.completedOccurrences.forEach(occ=>{
+        const od=new Date(occ.date+'T'+occ.time);
+        if(od.getMonth()===month && od.getFullYear()===year){
+          items.push({r, displayDate:occ.date, displayMs:occ.eventMs, completed:true});
+        }
+      });
+    }
+
     const baseD=new Date(r.date+'T'+r.time);
     // Проверяем базовую дату
     if(baseD.getMonth()===month && baseD.getFullYear()===year){
@@ -1412,8 +1440,12 @@ function renderCalResults(){
     el.innerHTML=`<div class="empty">В ${monthNames[month]} ${year} г. нет напоминаний</div>`;
     return;
   }
+  const now=Date.now();
   const prioColor={red:'var(--red-bg)',amber:'var(--amber-bg)',green:'var(--green-bg)',none:'var(--surface)'};
   const prioBorder={red:'var(--red-b)',amber:'var(--amber-b)',green:'var(--green-b)',none:'var(--border)'};
+  // Тёмные цвета для выполненных карточек
+  const doneColor={red:'#3d1010',amber:'#2e1a00',green:'#0d2200',none:'#1e1e1c'};
+  const doneBorder={red:'#7a2020',amber:'#6b3d00',green:'#2a5000',none:'#3a3a38'};
   el.innerHTML=`<div style="font-size:13px;color:var(--muted);margin-bottom:10px">Найдено: <b style="color:var(--text)">${filtered.length}</b></div>`+
   filtered.map(item=>{
     const r=item.r;
@@ -1422,20 +1454,26 @@ function renderCalResults(){
     const dayNames=['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
     const d=new Date(item.displayDate+'T00:00:00');
     const dayName=dayNames[d.getDay()];
-    return `<div style="background:${prioColor[p]};border:.5px solid ${prioBorder[p]};border-radius:var(--r);padding:1rem 1.1rem;margin-bottom:10px">
+    // Определяем: это выполненное вхождение (из истории) или текущее прошедшее
+    const isCompleted = item.completed || (r.fired && item.displayMs <= now) || (!item.completed && item.displayMs < now);
+    const displayTime = item.time || r.time;
+    const bgColor = isCompleted ? doneColor[p] : prioColor[p];
+    const bdColor = isCompleted ? doneBorder[p] : prioBorder[p];
+    const titleColor = isCompleted ? '#ccc' : 'inherit';
+    return `<div style="background:${bgColor};border:.5px solid ${bdColor};border-radius:var(--r);padding:1rem 1.1rem;margin-bottom:10px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:10px">
-            ${r.photo?`<img src="${r.photo}" class="photo-thumb" onclick="event.stopPropagation();openLightbox('${r.photo}')" style="width:44px;height:44px;object-fit:cover;border-radius:50%;border:2px solid var(--border);flex-shrink:0">`:''}
+            ${r.photo?`<img src="${r.photo}" class="photo-thumb" onclick="event.stopPropagation();openLightbox('${r.photo}')" style="width:44px;height:44px;object-fit:cover;border-radius:50%;border:2px solid var(--border);flex-shrink:0;opacity:${isCompleted?'0.7':'1'}">`:''}
             <div>
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                <span style="font-size:20px;font-weight:700">${esc(r.title)}</span>
-                ${(r.fired || new Date(r.eventMs) < Date.now()) ? `<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:rgba(255,210,0,.15);color:#FFD700;border:.5px solid #FFD700;white-space:nowrap">✓ Выполнено</span>` : ''}
+                <span style="font-size:20px;font-weight:700;color:${titleColor}">${esc(r.title)}</span>
+                ${isCompleted ? `<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:rgba(255,210,0,.18);color:#FFD700;border:.5px solid rgba(255,210,0,.5);white-space:nowrap">✓ Выполнено</span>` : ''}
               </div>
-              <div style="font-size:13px;color:var(--muted);margin-top:2px">${dayName}, ${item.displayDate.split('-').reverse().join('.')} ${r.time} &nbsp;·&nbsp; ${dm.icon} ${dm.label}</div>
+              <div style="font-size:13px;color:${isCompleted?'#888':'var(--muted)'};margin-top:2px">${dayName}, ${item.displayDate.split('-').reverse().join('.')} ${displayTime} &nbsp;·&nbsp; ${dm.icon} ${dm.label}</div>
             </div>
           </div>
-          ${r.note?`<div style="font-size:13px;color:var(--muted);margin-top:5px;white-space:pre-wrap">${esc(r.note)}</div>`:''}
+          ${r.note?`<div style="font-size:13px;color:${isCompleted?'#777':'var(--muted)'};margin-top:5px;white-space:pre-wrap">${esc(r.note)}</div>`:''}
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
           <button class="edit-btn" onclick="closeCalModal();openEditModal(${r.id})" title="Изменить" style="font-size:15px;padding:5px 8px">✏️</button>
