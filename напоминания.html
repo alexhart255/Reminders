@@ -263,9 +263,9 @@
     <div class="frow">
       <div class="field">
         <label>Адрес (необязательно)</label>
-        <div style="display:flex;gap:8px;align-items:flex-start">
-          <input type="text" id="inp-address" placeholder="Например: ул. Ленина, 10, Москва" style="flex:1">
-          <button type="button" onclick="openInMaps('inp-address')" title="Посмотреть в Google Maps" style="font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;border-radius:var(--rs);padding:8px 12px;border:.5px solid var(--border);background:var(--surface);color:var(--text);white-space:nowrap;flex-shrink:0;transition:background .15s">🗺️ Google Maps</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" id="inp-address" placeholder="Например: ул. Ленина 10, Москва" style="flex:1">
+          <button type="button" onclick="openInMaps('inp-address')" title="Открыть в Google Maps" style="font-family:inherit;font-size:13px;padding:8px 12px;border:.5px solid var(--border);border-radius:var(--rs);background:var(--bg);color:var(--text);cursor:pointer;white-space:nowrap;transition:background .15s">🗺️ Maps</button>
         </div>
       </div>
     </div>
@@ -418,9 +418,9 @@
     <div class="frow">
       <div class="field">
         <label>Адрес (необязательно)</label>
-        <div style="display:flex;gap:8px;align-items:flex-start">
-          <input type="text" id="edit-address" placeholder="Например: ул. Ленина, 10, Москва" style="flex:1">
-          <button type="button" onclick="openInMaps('edit-address')" title="Посмотреть в Google Maps" style="font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;border-radius:var(--rs);padding:8px 12px;border:.5px solid var(--border);background:var(--surface);color:var(--text);white-space:nowrap;flex-shrink:0;transition:background .15s">🗺️ Google Maps</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" id="edit-address" placeholder="Например: ул. Ленина 10, Москва" style="flex:1">
+          <button type="button" onclick="openInMaps('edit-address')" title="Открыть в Google Maps" style="font-family:inherit;font-size:13px;padding:8px 12px;border:.5px solid var(--border);border-radius:var(--rs);background:var(--bg);color:var(--text);cursor:pointer;white-space:nowrap;transition:background .15s">🗺️ Maps</button>
         </div>
       </div>
     </div>
@@ -603,11 +603,11 @@ async function dbLoad(){
     reminders=rows.map(x=>({
       id:x.id,date:x.date,time:x.time,title:x.title,note:x.note||'',address:x.address||'',
       before:x.before||0,repeat:x.repeat||0,repeatUntil:x.repeat_until||0,
-      alertMs:x.alert_ms,eventMs:x.event_ms,fired:x.fired||false,
+      alertMs:x.alert_ms ? Number(x.alert_ms) : 0,
+      eventMs:x.event_ms ? Number(x.event_ms) : (x.date&&x.time ? new Date(x.date+'T'+x.time).getTime() : 0),
+      fired:x.fired||false,
       sound:x.sound||'silent',repeatCount:x.repeat_count||0,photo:x.photo||null,
-      priority:x.priority||'none',
-      originalDate:x.original_date||x.date,  // оригинальная дата для календаря
-      originalTime:x.original_time||x.time
+      priority:x.priority||'none'
     }));
     // Для просроченных повторяющихся — пересчитываем дату на следующую
     const nowMs = Date.now();
@@ -615,6 +615,7 @@ async function dbLoad(){
     let needSync = false;
     reminders.forEach(r=>{
       if(r.repeat && r.repeat>0 && !r.fired && r.eventMs < nowMs) {
+        console.warn('ПЕРЕСЧЁТ:', r.title, 'repeat='+r.repeat, 'eventMs='+r.eventMs, 'nowMs='+nowMs, 'date='+r.date);
         let nextMs = r.eventMs;
         // Прокручиваем вперёд пока не окажемся в будущем
         while(nextMs < nowMs) {
@@ -638,6 +639,8 @@ async function dbLoad(){
     });
     // Не вызываем render во время звонка — это не прерывает аудио
     if(currentAlarmId===null) render();
+    // Если модалка по месяцам открыта — обновляем её тоже
+    if(document.getElementById('cal-ov').style.display==='flex') renderCalResults();
   }catch(e){console.warn('Supabase load error:',e);}
 }
 
@@ -645,8 +648,7 @@ async function dbSave(r){
   const row={id:r.id,date:r.date,time:r.time,title:r.title,note:r.note,address:r.address||null,photo:r.photo||null,
     before:r.before,repeat:r.repeat,repeat_until:r.repeatUntil,
     alert_ms:r.alertMs,event_ms:r.eventMs,fired:r.fired,
-    sound:r.sound,repeat_count:r.repeatCount||0,priority:r.priority||'none',
-    original_date:r.date,original_time:r.time};
+    sound:r.sound,repeat_count:r.repeatCount||0,priority:r.priority||'none'};
   try{
     await fetch(SUPA_URL+'/rest/v1/Reminders',{
       method:'POST',
@@ -658,8 +660,7 @@ async function dbSave(r){
 
 async function dbUpdate(r){
   const row={fired:r.fired,alert_ms:r.alertMs,event_ms:r.eventMs,
-    date:r.date,time:r.time,repeat_count:r.repeatCount||0,priority:r.priority||'none',photo:r.photo||null,
-    original_date:r.originalDate||r.date,original_time:r.originalTime||r.time};
+    date:r.date,time:r.time,repeat_count:r.repeatCount||0,priority:r.priority||'none',photo:r.photo||null};
   try{
     await fetch(SUPA_URL+'/rest/v1/Reminders?id=eq.'+r.id,{
       method:'PATCH',headers:SUPA_HEADERS,body:JSON.stringify(row)
@@ -1182,7 +1183,7 @@ function render(){
               </div>
             </div>
             ${r.note?`<div class="ri-note">${esc(r.note)}</div>`:''}
-            ${r.address?`<div class="ri-note" style="margin-top:4px">📍 ${esc(r.address)} <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.address)}" target="_blank" rel="noopener" style="font-size:12px;color:var(--accent);text-decoration:none;font-weight:500;white-space:nowrap">🗺️ Google Maps</a></div>`:''}
+            ${r.address?`<div class="ri-note" style="margin-top:2px">📍 ${esc(r.address)} <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.address||'')}" target="_blank" rel="noopener" style="font-size:12px;color:var(--accent);text-decoration:none;font-weight:500;white-space:nowrap">🗺️ Google Maps</a></div>`:''}
             <div style="display:flex;gap:6px;margin-top:7px">
               <button type="button" class="prio-btn prio-none${!r.priority||r.priority==='none'?' sel':''}" onclick="changeReminderPriority(${r.id},'none')" title="Без цвета" style="width:18px;height:18px;flex-shrink:0"></button>
               <button type="button" class="prio-btn prio-red${r.priority==='red'?' sel':''}" onclick="changeReminderPriority(${r.id},'red')" title="Очень важно" style="width:18px;height:18px;flex-shrink:0"></button>
@@ -1321,16 +1322,12 @@ async function saveEdit(){
   r.sound=editSelectedSound; r.priority=editSelectedPriority;
   r.photo=window._editPhoto||null;
   r.fired=false; r.repeatCount=0;
-  // Сохраняем оригинальную дату — она не должна меняться при редактировании
-  if(!r.originalDate) r.originalDate=date;
-  if(!r.originalTime) r.originalTime=time;
   reminders.sort((a,b)=>a.eventMs-b.eventMs);
-  // Save full row to Supabase — сохраняем original_date/time чтобы календарь работал правильно
+  // Save full row to Supabase
   const row={id:r.id,date:r.date,time:r.time,title:r.title,note:r.note,address:r.address||null,photo:r.photo||null,
     before:r.before,repeat:r.repeat,repeat_until:r.repeatUntil,
     alert_ms:r.alertMs,event_ms:r.eventMs,fired:r.fired,
-    sound:r.sound,repeat_count:r.repeatCount,priority:r.priority,
-    original_date:r.originalDate||r.date,original_time:r.originalTime||r.time};
+    sound:r.sound,repeat_count:r.repeatCount,priority:r.priority};
   try{
     await fetch(SUPA_URL+'/rest/v1/Reminders',{
       method:'POST',
@@ -1352,8 +1349,7 @@ document.getElementById('edit-ov').addEventListener('click',function(e){
 function openInMaps(fieldId){
   const addr=(document.getElementById(fieldId)||{}).value||'';
   if(!addr.trim()){alert('Сначала введите адрес.');return;}
-  const url='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(addr.trim());
-  window.open(url,'_blank','noopener');
+  window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(addr.trim()),'_blank','noopener');
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
@@ -1365,8 +1361,7 @@ render();
 dbLoad();
 setInterval(()=>{checkAlarms();render();updateCountdowns();},10000);
 setInterval(()=>{updateCountdowns();},1000);
-// Синхронизация с облаком каждые 30 секунд
-setInterval(()=>{dbLoad();},30000);
+// Синхронизация с облаком только при загрузке страницы
 
 // ─── Calendar Modal ───────────────────────────────────────────────────────────
 function openCalModal(){
@@ -1399,73 +1394,63 @@ function renderCalResults(){
   const year=parseInt(document.getElementById('cal-year').value);
   const monthNames=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
   const pad=n=>String(n).padStart(2,'0');
+  const monthStart=new Date(year,month,1).getTime();
+  const monthEnd=new Date(year,month+1,1).getTime();
+  const now=Date.now();
 
   const items=[];
   reminders.forEach(r=>{
-    if(!r.date) return;
+    if(!r.date||!r.time) return;
 
-    // Для ежегодных (день рождения и т.п.) — базовая дата = тот же день и месяц, но нужный год
+    // Одноразовые: показываем только если дата события в выбранном месяце И в будущем
+    if(!r.repeat || r.repeat===0){
+      const evMs=new Date(r.date+'T'+r.time).getTime();
+      if(evMs>=monthStart && evMs<monthEnd && evMs>now){
+        const ds=r.date;
+        items.push({r, displayDate:ds, displayMs:evMs});
+      }
+      return;
+    }
+
+    // Повторяющиеся: ищем вхождение в нужный месяц/год
+    // Используем r.eventMs как базу (он может быть пересчитан вперёд),
+    // поэтому откатываемся к исходному дню/месяцу через setFullYear/setMonth
+    const base=new Date(r.eventMs);
+    let cur;
     if(r.repeat===525600){
-      // Берём день и месяц из originalDate или r.date
-      const base = new Date((r.originalDate||r.date)+'T'+(r.originalTime||r.time));
-      const occurrence = new Date(year, base.getMonth(), base.getDate(),
-        base.getHours(), base.getMinutes());
-      if(occurrence.getMonth()===month){ // день/месяц совпадают
-        const ds=`${year}-${pad(month+1)}-${pad(base.getDate())}`;
-        items.push({r, displayDate:ds, displayMs:occurrence.getTime()});
+      // Ежегодно: тот же день и месяц, нужный год
+      cur=new Date(year, base.getMonth(), base.getDate(), base.getHours(), base.getMinutes());
+    } else if(r.repeat===43200){
+      // Ежемесячно: тот же день, нужный месяц и год
+      cur=new Date(year, month, base.getDate(), base.getHours(), base.getMinutes());
+    } else {
+      // Другие интервалы (каждый день, каждую неделю и т.п.)
+      // r.eventMs уже указывает на следующее вхождение — просто проверяем попадает ли оно в нужный месяц
+      if(r.eventMs>=monthStart && r.eventMs<monthEnd && r.eventMs>now){
+        const nd=new Date(r.eventMs);
+        const ds=`${nd.getFullYear()}-${pad(nd.getMonth()+1)}-${pad(nd.getDate())}`;
+        items.push({r, displayDate:ds, displayMs:r.eventMs});
       }
       return;
     }
 
-    // Для ежемесячных — тот же день, но нужный месяц/год
-    if(r.repeat===43200){
-      const base = new Date((r.originalDate||r.date)+'T'+(r.originalTime||r.time));
-      const occurrence = new Date(year, month, base.getDate(),
-        base.getHours(), base.getMinutes());
-      // Проверяем что дата не "уехала" (например 31 февраля -> март)
-      if(occurrence.getMonth()===month){
-        const ds=`${year}-${pad(month+1)}-${pad(base.getDate())}`;
-        items.push({r, displayDate:ds, displayMs:occurrence.getTime()});
-      }
-      return;
-    }
+    // Для ежегодных: проверяем что месяц совпадает
+    if(r.repeat===525600 && cur.getMonth()!==month) return;
+    // Проверяем что дата не "уехала" (напр. 31 февраля)
+    if(cur.getMonth()!==month && r.repeat===43200) return;
 
-    // Для одноразовых и других повторов — используем actualDate
-    // originalDate хранит дату создания; если нет — берём r.date
-    const baseDate = r.originalDate || r.date;
-    const baseTime = r.originalTime || r.time;
-    const baseD = new Date(baseDate+'T'+baseTime);
-
-    if(baseD.getMonth()===month && baseD.getFullYear()===year){
-      items.push({r, displayDate:baseDate, displayMs:baseD.getTime()});
-      return;
-    }
-
-    // Для других интервальных повторов (каждый день, неделю и т.п.)
-    if(!r.repeat || r.repeat===0 || r.repeat<1440) return;
-
-    let cur = new Date(baseD);
-    const targetMs = new Date(year, month, 1).getTime();
-    if(cur.getTime() < targetMs){
-      const diff = targetMs - cur.getTime();
-      const steps = Math.ceil(diff / (r.repeat * 60000));
-      cur = new Date(cur.getTime() + steps * r.repeat * 60000);
-    }
-    for(let i=0;i<100;i++){
-      if(cur.getFullYear() > year) break;
-      if(cur.getMonth()===month && cur.getFullYear()===year){
-        const ds=`${cur.getFullYear()}-${pad(cur.getMonth()+1)}-${pad(cur.getDate())}`;
-        items.push({r, displayDate:ds, displayMs:cur.getTime()});
-        break;
-      }
-      cur=new Date(cur.getTime()+r.repeat*60000);
+    const curMs=cur.getTime();
+    // Показываем только если в будущем
+    if(curMs>=monthStart && curMs<monthEnd && curMs>now){
+      const ds=`${cur.getFullYear()}-${pad(cur.getMonth()+1)}-${pad(cur.getDate())}`;
+      items.push({r, displayDate:ds, displayMs:curMs});
     }
   });
 
   items.sort((a,b)=>a.displayMs-b.displayMs);
   const el=document.getElementById('cal-results');
   if(!items.length){
-    el.innerHTML=`<div class="empty">В ${monthNames[month]} ${year} г. нет напоминаний</div>`;
+    el.innerHTML=`<div class="empty">В ${monthNames[month]} ${year} г. нет предстоящих напоминаний</div>`;
     return;
   }
   const prioColor={red:'var(--red-bg)',amber:'var(--amber-bg)',green:'var(--green-bg)',none:'var(--surface)'};
@@ -1478,17 +1463,13 @@ function renderCalResults(){
     const dayNames=['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
     const d=new Date(item.displayDate+'T00:00:00');
     const dayName=dayNames[d.getDay()];
-    const isPast = item.displayMs < Date.now();
     return `<div style="background:${prioColor[p]};border:.5px solid ${prioBorder[p]};border-radius:var(--r);padding:1rem 1.1rem;margin-bottom:10px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:10px">
             ${r.photo?`<img src="${r.photo}" class="photo-thumb" onclick="event.stopPropagation();openLightbox('${r.photo}')" style="width:44px;height:44px;object-fit:cover;border-radius:50%;border:2px solid var(--border);flex-shrink:0">`:''}
             <div>
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                <span style="font-size:20px;font-weight:700">${esc(r.title)}</span>
-                ${isPast ? `<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:rgba(255,210,0,.15);color:#FFD700;border:.5px solid #FFD700;white-space:nowrap">✓ Выполнено</span>` : ''}
-              </div>
+              <div style="font-size:20px;font-weight:700">${esc(r.title)}</div>
               <div style="font-size:13px;color:var(--muted);margin-top:2px">${dayName}, ${item.displayDate.split('-').reverse().join('.')} ${r.time} &nbsp;·&nbsp; ${dm.icon} ${dm.label}</div>
             </div>
           </div>
@@ -1503,9 +1484,6 @@ function renderCalResults(){
     </div>`;
   }).join('');
 }
-document.getElementById('cal-ov').addEventListener('click',function(e){
-  if(e.target===this) closeCalModal();
-});
 
 
 // ─── Photo helpers ────────────────────────────────────────────────────────────
@@ -1919,6 +1897,11 @@ function closeXCalModal() {
     <div id="cal-results"></div>
   </div>
 </div>
+<script>
+document.getElementById('cal-ov').addEventListener('click',function(e){
+  if(e.target===this) closeCalModal();
+});
+</script>
 
 <div id="lightbox" onclick="closeLightbox()">
   <img id="lightbox-img" src="" alt="">
