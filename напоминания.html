@@ -658,7 +658,8 @@ async function dbSave(r){
 
 async function dbUpdate(r){
   const row={fired:r.fired,alert_ms:r.alertMs,event_ms:r.eventMs,
-    date:r.date,time:r.time,repeat_count:r.repeatCount||0,priority:r.priority||'none',photo:r.photo||null};
+    date:r.date,time:r.time,repeat_count:r.repeatCount||0,priority:r.priority||'none',photo:r.photo||null,
+    original_date:r.originalDate||r.date,original_time:r.originalTime||r.time};
   try{
     await fetch(SUPA_URL+'/rest/v1/Reminders?id=eq.'+r.id,{
       method:'PATCH',headers:SUPA_HEADERS,body:JSON.stringify(row)
@@ -1320,12 +1321,16 @@ async function saveEdit(){
   r.sound=editSelectedSound; r.priority=editSelectedPriority;
   r.photo=window._editPhoto||null;
   r.fired=false; r.repeatCount=0;
+  // Сохраняем оригинальную дату — она не должна меняться при редактировании
+  if(!r.originalDate) r.originalDate=date;
+  if(!r.originalTime) r.originalTime=time;
   reminders.sort((a,b)=>a.eventMs-b.eventMs);
-  // Save full row to Supabase
+  // Save full row to Supabase — сохраняем original_date/time чтобы календарь работал правильно
   const row={id:r.id,date:r.date,time:r.time,title:r.title,note:r.note,address:r.address||null,photo:r.photo||null,
     before:r.before,repeat:r.repeat,repeat_until:r.repeatUntil,
     alert_ms:r.alertMs,event_ms:r.eventMs,fired:r.fired,
-    sound:r.sound,repeat_count:r.repeatCount,priority:r.priority};
+    sound:r.sound,repeat_count:r.repeatCount,priority:r.priority,
+    original_date:r.originalDate||r.date,original_time:r.originalTime||r.time};
   try{
     await fetch(SUPA_URL+'/rest/v1/Reminders',{
       method:'POST',
