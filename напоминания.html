@@ -1156,6 +1156,7 @@ function render(){
     return (r.eventMs>=now7 && r.eventMs<=in7days) || (!r.fired && r.alertMs>now7 && r.alertMs<=in7days);
   });
   if(!visibleReminders.length){list.innerHTML='<div class="empty">В ближайшие 7 дней напоминаний нет</div>';return;}
+  visibleReminders.sort((a,b)=>a.eventMs-b.eventMs);
   list.innerHTML=visibleReminders.map(r=>{
     const m=soundMeta(r.sound);
     const ringing=currentAlarmId===r.id;
