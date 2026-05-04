@@ -82,7 +82,7 @@
   .ri-main{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
   .ri-left{flex:1;min-width:0}
   .ri-title{font-size:22px;font-weight:700;margin-bottom:2px;line-height:1.2}
-  .ri-date{font-size:15px;font-weight:500;color:var(--muted);margin-bottom:2px}
+  .ri-date{font-size:15px;font-weight:500;color:#ffffff;margin-bottom:2px}
   .ri-note{font-size:13px;color:var(--muted);margin-top:2px;white-space:pre-wrap}
   .ri-badges{display:flex;flex-direction:column;gap:6px;align-items:stretch;flex-shrink:0;min-width:155px}
   .badge{font-size:13px;padding:5px 12px;border-radius:var(--rs);border:.5px solid;font-weight:600;white-space:nowrap;text-align:center}
@@ -1171,7 +1171,7 @@ function render(){
               ${r.photo?`<img src="${r.photo}" class="photo-thumb" onclick="event.stopPropagation();openLightbox('${r.photo}')" style="width:44px;height:44px;object-fit:cover;border-radius:50%;border:2px solid var(--border);flex-shrink:0">`:''}
               <div>
                 <div class="ri-title" style="${prioStyle}">${esc(r.title)}</div>
-                <div class="ri-date" style="${prioStyle}">${fmtDT(r.date,r.time)}</div>
+                <div class="ri-date">${fmtDT(r.date,r.time)}</div>
               </div>
             </div>
             ${r.note?`<div class="ri-note">${esc(r.note)}</div>`:''}
