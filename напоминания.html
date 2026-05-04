@@ -1175,12 +1175,7 @@ function render(){
               </div>
             </div>
             ${r.note?`<div class="ri-note">${esc(r.note)}</div>`:''}
-            <div style="display:flex;gap:6px;margin-top:7px">
-              <button type="button" class="prio-btn prio-none${!r.priority||r.priority==='none'?' sel':''}" onclick="changeReminderPriority(${r.id},'none')" title="Без цвета" style="width:18px;height:18px;flex-shrink:0"></button>
-              <button type="button" class="prio-btn prio-red${r.priority==='red'?' sel':''}" onclick="changeReminderPriority(${r.id},'red')" title="Очень важно" style="width:18px;height:18px;flex-shrink:0"></button>
-              <button type="button" class="prio-btn prio-amber${r.priority==='amber'?' sel':''}" onclick="changeReminderPriority(${r.id},'amber')" title="Средне важно" style="width:18px;height:18px;flex-shrink:0"></button>
-              <button type="button" class="prio-btn prio-green${r.priority==='green'?' sel':''}" onclick="changeReminderPriority(${r.id},'green')" title="Мало важно" style="width:18px;height:18px;flex-shrink:0"></button>
-            </div>
+
           </div>
           <div class="ri-badges">
             <span class="badge ${cdCls} countdown" id="cd-${r.id}"></span>
