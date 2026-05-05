@@ -160,10 +160,8 @@
   .xcal-tab.active{background:var(--surface);color:var(--text);border-color:var(--accent);border-bottom-color:var(--surface)}
   .xcal-table-wrap{overflow:auto;max-height:420px;border:.5px solid var(--border);border-radius:0 var(--rs) var(--rs) var(--rs)}
   .xcal-table{border-collapse:collapse;font-size:12px;white-space:nowrap;min-width:100%}
-  .xcal-table th{background:var(--bg);font-weight:600;color:var(--muted);padding:6px 10px;border:.5px solid var(--border);position:sticky;top:0;z-index:1;font-size:11px}
-  .xcal-table td{padding:5px 10px;border:.5px solid var(--border);color:var(--text);max-width:220px;overflow:hidden;text-overflow:ellipsis}
-  .xcal-table tr:nth-child(even) td{background:rgba(0,0,0,.02)}
-  @media(prefers-color-scheme:dark){.xcal-table tr:nth-child(even) td{background:rgba(255,255,255,.03)}}
+  .xcal-table th{font-weight:600;padding:6px 10px;border:.5px solid var(--border);position:sticky;top:0;z-index:1;font-size:11px}
+  .xcal-table td{padding:5px 10px;border:.5px solid var(--border);max-width:220px;overflow:hidden;text-overflow:ellipsis}
   .xcal-preview-loading{text-align:center;padding:1.5rem;color:var(--muted);font-size:13px}
 </style>
 </head>
@@ -1575,7 +1573,7 @@ async function xcalUpload(file) {
     // Удаляем старый файл если есть
     await fetch(
       SUPA_URL + '/storage/v1/object/' + XCAL_BUCKET + '/' + XCAL_FILE_PATH,
-      { method: 'DELETE', headers: SUPA_HEADERS }
+      { method: 'DELETE', headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY } }
     );
     // Загружаем новый
     const uploadHeaders = {
@@ -1621,34 +1619,43 @@ async function xcalPreview() {
   }
 }
 
+function xcalArgbToHex(argb) {
+  if (!argb || typeof argb !== 'string') return null;
+  // SheetJS returns either 6-char RGB or 8-char ARGB
+  const hex = argb.length === 8 ? argb.slice(2) : argb;
+  if (hex.length !== 6) return null;
+  if (/^(FFFFFF|ffffff|000000)$/i.test(hex)) return null;
+  return '#' + hex;
+}
+
 function xcalGetCellStyle(ws, col, row) {
   const addr = XLSX.utils.encode_cell({ c: col, r: row });
   const cell = ws[addr];
   if (!cell || !cell.s) return '';
   let style = '';
-  // Background fill
-  const fill = cell.s.fgColor || (cell.s.fill && cell.s.fill.fgColor);
-  if (fill) {
-    let rgb = fill.rgb;
-    if (!rgb && fill.theme !== undefined) rgb = null; // theme colors harder to resolve
-    if (rgb && rgb !== 'FFFFFFFF' && rgb !== 'FF000000' && rgb.length >= 6) {
-      // ARGB → RGB (strip alpha)
-      const hex = rgb.length === 8 ? rgb.slice(2) : rgb;
-      style += `background:#${hex};`;
-    }
+  const s = cell.s;
+
+  // SheetJS with cellStyles:true stores fill as: s.patternType + s.fgColor + s.bgColor
+  // Only apply fgColor as background when patternType is 'solid'
+  let bgHex = null;
+  if (s.patternType === 'solid' || s.patternType === undefined) {
+    if (!bgHex && s.fgColor) bgHex = xcalArgbToHex(s.fgColor.rgb || s.fgColor.argb);
+    if (!bgHex && s.bgColor && s.bgColor.rgb && s.bgColor.rgb !== '000000') bgHex = xcalArgbToHex(s.bgColor.rgb || s.bgColor.argb);
+    // nested fill object fallback
+    if (!bgHex && s.fill && s.fill.fgColor) bgHex = xcalArgbToHex(s.fill.fgColor.rgb || s.fill.fgColor.argb);
   }
+  if (bgHex) style += 'background:' + bgHex + ';';
+
   // Font color
-  const font = cell.s.color || (cell.s.font && cell.s.font.color);
-  if (font && font.rgb) {
-    const hex = font.rgb.length === 8 ? font.rgb.slice(2) : font.rgb;
-    if (hex && hex !== '000000' && hex !== 'FF000000') {
-      style += `color:#${hex};`;
-    }
+  const fontColor = (s.font && s.font.color) || s.color;
+  if (fontColor) {
+    const fhex = xcalArgbToHex(fontColor.rgb || fontColor.argb);
+    if (fhex) style += 'color:' + fhex + ';';
   }
+
   // Bold
-  if (cell.s.bold || (cell.s.font && cell.s.font.bold)) {
-    style += 'font-weight:600;';
-  }
+  if (s.bold || (s.font && s.font.bold)) style += 'font-weight:600;';
+
   return style;
 }
 
@@ -1684,7 +1691,8 @@ function renderXCalTable(container) {
     const cell = ws[addr];
     const val = cell ? (cell.v !== undefined ? cell.v : '') : '';
     const st = xcalGetCellStyle(ws, range.s.c + ci, range.s.r);
-    tableHtml += `<th style="${st}">${val !== '' ? val : '&nbsp;'}</th>`;
+    const thDefault = st ? (st.includes('color:') ? '' : 'color:var(--muted);') : 'background:var(--bg);color:var(--muted);';
+    tableHtml += `<th style="${thDefault}${st}">${val !== '' ? val : '&nbsp;'}</th>`;
   });
   tableHtml += '</tr></thead><tbody>';
 
@@ -1700,7 +1708,8 @@ function renderXCalTable(container) {
       let val = cell ? (cell.v !== undefined ? cell.v : '') : '';
       if (val instanceof Date) val = val.toLocaleDateString('ru-RU');
       const st = xcalGetCellStyle(ws, sheetCol, sheetRow);
-      tableHtml += `<td style="${st}" title="${String(val).replace(/"/g,'&quot;')}">${val !== '' ? val : '&nbsp;'}</td>`;
+      const tdDefault = st.includes('color:') ? '' : 'color:var(--text);';
+      tableHtml += `<td style="${tdDefault}${st}" title="${String(val).replace(/"/g,'&quot;')}">${val !== '' ? val : '&nbsp;'}</td>`;
     });
     tableHtml += '</tr>';
   }
@@ -1712,10 +1721,19 @@ function renderXCalTable(container) {
 async function xcalDelete() {
   if (!confirm('Удалить файл календаря?')) return;
   try {
-    await fetch(
+    const storageHeaders = {
+      'apikey': SUPA_KEY,
+      'Authorization': 'Bearer ' + SUPA_KEY
+    };
+    const r = await fetch(
       SUPA_URL + '/storage/v1/object/' + XCAL_BUCKET + '/' + XCAL_FILE_PATH,
-      { method: 'DELETE', headers: SUPA_HEADERS }
+      { method: 'DELETE', headers: storageHeaders }
     );
+    if (!r.ok) {
+      const err = await r.text();
+      throw new Error('Статус ' + r.status + ': ' + err);
+    }
+    window._xcalWorkbook = null;
     renderXCalModal();
   } catch(e) {
     alert('Ошибка удаления: ' + e.message);
