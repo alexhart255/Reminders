@@ -138,9 +138,9 @@
   .edit-sound-dd.open{display:grid}
   @media(max-width:400px){.edit-sound-dd{grid-template-columns:repeat(3,1fr)}}
   /* Excel Calendar Modal */
-  #xcal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1200;align-items:center;justify-content:center;padding:1rem}
+  #xcal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1200;align-items:center;justify-content:center;padding:0.5rem}
   #xcal-ov.show{display:flex}
-  .xcal-box{background:var(--surface);border-radius:var(--r);padding:1.5rem;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;border:.5px solid var(--border)}
+  .xcal-box{background:var(--surface);border-radius:var(--r);padding:1.5rem;max-width:100%;width:100%;height:99vh;max-height:99vh;overflow-y:auto;border:.5px solid var(--border);display:flex;flex-direction:column}
   .xcal-box h2{font-size:17px;font-weight:600;margin-bottom:1rem}
   .xcal-upload-zone{border:.5px dashed var(--border-h);border-radius:var(--rs);padding:20px 16px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;font-size:14px;color:var(--muted);margin-bottom:1rem}
   .xcal-upload-zone:hover{border-color:var(--accent);background:var(--blue-bg);color:var(--blue-t)}
@@ -153,12 +153,12 @@
   .xcal-actions{display:flex;gap:8px;flex-wrap:wrap}
   .xcal-hint{font-size:12px;color:var(--muted);text-align:center;margin-top:.5rem}
   /* Excel preview */
-  .xcal-box{max-width:900px!important}
+  
   .xcal-preview{margin-top:1rem}
   .xcal-sheet-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
   .xcal-tab{font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;padding:5px 12px;border:.5px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;background:var(--bg);color:var(--muted);transition:background .15s,color .15s;border-bottom:none}
   .xcal-tab.active{background:var(--surface);color:var(--text);border-color:var(--accent);border-bottom-color:var(--surface)}
-  .xcal-table-wrap{overflow:auto;max-height:420px;border:.5px solid var(--border);border-radius:0 var(--rs) var(--rs) var(--rs)}
+  .xcal-table-wrap{overflow:auto;flex:1;max-height:calc(99vh - 180px);border:.5px solid var(--border);border-radius:0 var(--rs) var(--rs) var(--rs)}
   .xcal-table{border-collapse:collapse;font-size:12px;white-space:nowrap;min-width:100%}
   .xcal-table th{font-weight:600;padding:6px 10px;border:.5px solid var(--border);position:sticky;top:0;z-index:1;font-size:11px}
   .xcal-table td{padding:5px 10px;border:.5px solid var(--border);max-width:220px;overflow:hidden;text-overflow:ellipsis}
