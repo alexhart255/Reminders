@@ -1000,6 +1000,9 @@ async function processQueue(){
   } else {
     if(r.sound!=='silent'){
       playSound(r.sound,false);
+      bellInterval=setInterval(()=>{
+        if(!alarmAudio||alarmAudio.paused||alarmAudio.ended) playSound(r.sound,false);
+      },5000);
     }
   }
   render();
@@ -1028,7 +1031,7 @@ function dismissCurrent(){
     const r=reminders.find(x=>x.id===currentAlarmId);
     if(r){
       // Проверяем нужно ли повторить
-      if(r.repeat && r.repeat > 0){
+      if(r.repeat && r.repeat > 0 && !r.fired){
         r.repeatCount = (r.repeatCount||0) + 1;
         const maxRepeats = r.repeatUntil || 0;
         if(maxRepeats === 0 || r.repeatCount < maxRepeats){
@@ -1139,18 +1142,17 @@ function render(){
   const list=document.getElementById('list');
   if(!reminders.length){list.innerHTML='<div class="empty">Напоминаний пока нет</div>';return;}
   const now7=Date.now();
-  const in7days=now7+7*24*60*60*1000;
+  const todayStart=new Date(); todayStart.setHours(0,0,0,0);
+  const todayEnd=new Date(); todayEnd.setHours(23,59,59,999);
+  const todayStartMs=todayStart.getTime();
+  const todayEndMs=todayEnd.getTime();
   const visibleReminders=reminders.filter(r=>{
-    const isRepeating = r.repeat && r.repeat>0 && !r.fired && (!r.repeatUntil || r.repeatUntil===0);
-    if(isRepeating) {
-      // Просроченное повторяющееся — всегда показываем (ждёт следующего цикла)
-      if(r.eventMs < now7) return true;
-      // Все повторяющиеся — показываем только в пределах 7 дней
-      return r.eventMs <= in7days;
-    }
-    return (r.eventMs>=now7 && r.eventMs<=in7days) || (!r.fired && r.alertMs>now7 && r.alertMs<=in7days);
+    if(r.fired) return false;
+    return (r.eventMs>=todayStartMs && r.eventMs<=todayEndMs) ||
+           (r.alertMs>=todayStartMs && r.alertMs<=todayEndMs) ||
+           (r.alertMs<now7 && r.eventMs>=todayStartMs);
   });
-  if(!visibleReminders.length){list.innerHTML='<div class="empty">В ближайшие 7 дней напоминаний нет</div>';return;}
+  if(!visibleReminders.length){list.innerHTML='<div class="empty">На сегодня напоминаний нет</div>';return;}
   visibleReminders.sort((a,b)=>a.eventMs-b.eventMs);
   list.innerHTML=visibleReminders.map(r=>{
     const m=soundMeta(r.sound);
