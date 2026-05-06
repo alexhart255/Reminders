@@ -1000,9 +1000,6 @@ async function processQueue(){
   } else {
     if(r.sound!=='silent'){
       playSound(r.sound,false);
-      bellInterval=setInterval(()=>{
-        if(!alarmAudio||alarmAudio.paused||alarmAudio.ended) playSound(r.sound,false);
-      },5000);
     }
   }
   render();
