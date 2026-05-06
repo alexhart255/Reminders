@@ -580,14 +580,19 @@ async function dbLoad(){
     const r=await fetch(SUPA_URL+'/rest/v1/Reminders?order=alert_ms.asc',{headers:SUPA_HEADERS});
     const rows=await r.json();
     if(!Array.isArray(rows)) return;
-    reminders=rows.map(x=>({
-      id:x.id,date:x.date,time:x.time,title:x.title,note:x.note||'',
-      before:x.before||0,repeat:x.repeat||0,repeatUntil:x.repeat_until||0,
-      alertMs:x.alert_ms,eventMs:x.event_ms,fired:x.fired||false,
-      sound:x.sound||'silent',repeatCount:x.repeat_count||0,photo:x.photo||null,
-      priority:x.priority||'none',
-      completedOccurrences:x.completed_occurrences?JSON.parse(x.completed_occurrences):[]
-    }));
+    reminders=rows.map(x=>{
+      // Сохраняем локальный fired=true — не даём базе его перезаписать
+      const existing=reminders.find(r=>r.id===x.id);
+      const firedLocal=existing&&existing.fired===true;
+      return {
+        id:x.id,date:x.date,time:x.time,title:x.title,note:x.note||'',
+        before:x.before||0,repeat:x.repeat||0,repeatUntil:x.repeat_until||0,
+        alertMs:x.alert_ms,eventMs:x.event_ms,fired:firedLocal||(x.fired||false),
+        sound:x.sound||'silent',repeatCount:x.repeat_count||0,photo:x.photo||null,
+        priority:x.priority||'none',
+        completedOccurrences:x.completed_occurrences?JSON.parse(x.completed_occurrences):[]
+      };
+    });
     // Для просроченных повторяющихся — пересчитываем дату на следующую
     const nowMs = Date.now();
     const padL = n => String(n).padStart(2,'0');
@@ -1086,7 +1091,9 @@ function closealarm(){
 function checkAlarms(){
   const now=Date.now();
   reminders.forEach(r=>{
-    if(!r.fired&&now>=r.alertMs){
+    if(!r.fired && now>=r.alertMs){
+      // Не срабатывать если напоминание просрочено больше чем на 5 минут
+      if(now - r.alertMs > 5*60*1000) return;
       if(!ringQueue.includes(r.id)){ringQueue.push(r.id);if(ringQueue.length===1)processQueue();}
     }
   });
