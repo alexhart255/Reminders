@@ -1458,23 +1458,23 @@ function renderCalResults(){
     const displayTime = item.time || r.time;
     const titleColor = isCompleted ? doneTextColor[p] : prioTextColor[p];
     return `<div style="background:var(--surface);border:.5px solid var(--border);border-radius:var(--r);padding:1rem 1.1rem;margin-bottom:10px">
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="display:flex;align-items:flex-start;gap:10px">
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:10px">
             ${r.photo?`<img src="${r.photo}" class="photo-thumb" onclick="event.stopPropagation();openLightbox('${r.photo}')" style="width:44px;height:44px;object-fit:cover;border-radius:50%;border:2px solid var(--border);flex-shrink:0;opacity:${isCompleted?'0.6':'1'}">`:''}
             <div>
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                <span style="font-size:20px;font-weight:700;color:${titleColor}">${esc(r.title)}</span>
-                ${isCompleted ? `<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:rgba(255,210,0,.18);color:#FFD700;border:.5px solid rgba(255,210,0,.5);white-space:nowrap">✓ Выполнено</span>` : ''}
-              </div>
-              <div style="font-size:13px;color:${isCompleted?'var(--muted)':'var(--muted)'};margin-top:2px">${dayName}, ${item.displayDate.split('-').reverse().join('.')} ${displayTime} &nbsp;·&nbsp; ${dm.icon} ${dm.label}</div>
+              <div style="font-size:20px;font-weight:700;color:${titleColor};line-height:1.2">${esc(r.title)}</div>
+              <div style="font-size:13px;color:var(--muted);margin-top:2px">${dayName}, ${item.displayDate.split('-').reverse().join('.')} ${displayTime} &nbsp;·&nbsp; ${dm.icon} ${dm.label}</div>
             </div>
           </div>
-          ${r.note?`<div style="font-size:13px;color:${isCompleted?'var(--muted)':'var(--muted)'};margin-top:5px;white-space:pre-wrap">${esc(r.note)}</div>`:''}
+          ${r.note?`<div style="font-size:13px;color:var(--muted);margin-top:5px;white-space:pre-wrap">${esc(r.note)}</div>`:''}
         </div>
-        <div style="display:flex;gap:6px;flex-shrink:0">
-          <button class="edit-btn" onclick="closeCalModal();openEditModal(${r.id})" title="Изменить" style="font-size:15px;padding:5px 8px">✏️</button>
-          <button class="del-btn" onclick="calDeleteReminder(${r.id})" title="Удалить" style="font-size:15px;padding:5px 8px">✕</button>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
+          <div style="display:flex;gap:6px">
+            <button class="edit-btn" onclick="closeCalModal();openEditModal(${r.id})" title="Изменить" style="font-size:15px;padding:5px 8px">✏️</button>
+            <button class="del-btn" onclick="calDeleteReminder(${r.id})" title="Удалить" style="font-size:15px;padding:5px 8px">✕</button>
+          </div>
+          ${isCompleted ? `<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:rgba(255,210,0,.18);color:#FFD700;border:.5px solid rgba(255,210,0,.5);white-space:nowrap">✓ Выполнено</span>` : ''}
         </div>
       </div>
     </div>`;
