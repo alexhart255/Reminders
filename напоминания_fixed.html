@@ -591,7 +591,7 @@ const XCAL_FILE_PATH='kalender.xlsx';
 
 async function dbLoad(){
   try{
-    const r=await fetch(SUPA_URL+'/rest/v1/Reminders?order=alert_ms.asc',{headers:SUPA_HEADERS});
+    const r=await fetch(SUPA_URL+'/rest/v1/Reminders?order=alert_ms.asc',{headers:{...SUPA_HEADERS,'Cache-Control':'no-cache','Pragma':'no-cache'},cache:'no-store'});
     const rows=await r.json();
     if(!Array.isArray(rows)) return;
     reminders=rows.map(x=>{
@@ -1369,7 +1369,7 @@ async function saveEdit(){
     });
   }catch(e){console.warn('Supabase update error:',e);}
   closeEditModal();
-  render();
+  await dbLoad();
   updateCountdowns();
 }
 
