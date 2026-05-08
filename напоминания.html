@@ -1210,40 +1210,56 @@ function render(){
     const cdCls=r.fired?'bg':r.eventMs<now2?'br':r.alertMs-now2<0?'ba':'bb';
     const prioColors={red:'#e24b4a',amber:'#f0a820',green:'#4caf50',none:''};
     const prioStyle=r.priority&&r.priority!=='none'?`color:${prioColors[r.priority]}`:'';
-    return`<div class="ri${ringing?' ringing':''}" id="ri-${r.id}">
-      <div class="ri-body">
-        <div class="ri-main">
-          <div class="ri-left">
-            <div style="display:flex;align-items:center;gap:10px">
-              ${r.photo?`<img src="${r.photo}" class="photo-thumb" onclick="event.stopPropagation();openLightbox('${r.photo}')" style="width:44px;height:44px;object-fit:cover;border-radius:50%;border:2px solid var(--border);flex-shrink:0">`:''}
-              <div>
-                <div class="ri-title" style="${prioStyle}">${esc(r.title)}</div>
-                <div class="ri-date">${fmtDT(r.date,r.time)}</div>
-              </div>
-            </div>
-            ${r.note?`<div class="ri-note">${esc(r.note)}</div>`:''}
-            ${r.address?`
-              <div class="ri-address"><span class="ri-address-icon">📍</span><span>${esc(r.address)}</span></div>
-              <div class="nav-btns">
-                <a class="nav-btn nav-btn-map" href="https://maps.google.com/?q=${encodeURIComponent(r.address)}" target="_blank">🗺 Map</a>
-                <a class="nav-btn nav-btn-sbb" href="https://www.sbb.ch/de/kaufen/pages/fahrplan/fahrplan.xhtml?nach=${encodeURIComponent(r.address)}" target="_blank">🚆 SBB</a>
-              </div>`:''}
-            ${r.phone?`
-              <div class="ri-address"><span class="ri-address-icon">📞</span><span>${esc(r.phone)}</span></div>
-              <div class="nav-btns">
-                <a class="nav-btn nav-btn-call" href="tel:${encodeURIComponent(r.phone)}">📞 Позвонить</a>
-              </div>`:''}
-
-          </div>
-          <div class="ri-badges">
-            <span class="badge ${cdCls} countdown" id="cd-${r.id}"></span>
-            <span class="badge bl">напомнить ${blabel(r.before)}</span>
-            ${r.repeat?`<span class="badge bp">🔁 ${rlabel(r.repeat)}</span>`:''}
-          </div>
+    const T='font-size:14px;font-weight:400;color:var(--text)';
+    const rowStyle='display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:28px;';
+    const leftStyle=T+';flex-shrink:0;max-width:55%';
+    const rightStyle=T+';display:flex;gap:5px;align-items:center;justify-content:flex-end;flex-wrap:wrap';
+    const badgeT='font-size:14px;font-weight:400;padding:3px 10px';
+    return`<div class="ri${ringing?' ringing':''}" id="ri-${r.id}" style="flex-direction:column;align-items:stretch;gap:0">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
+          ${r.photo?`<img src="${r.photo}" class="photo-thumb" onclick="event.stopPropagation();openLightbox('${r.photo}')" style="width:36px;height:36px;object-fit:cover;border-radius:50%;border:2px solid var(--border);flex-shrink:0">`:''}
+          <div class="ri-title" style="${prioStyle};font-size:18px;font-weight:700;line-height:1.2">${esc(r.title)}</div>
+        </div>
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          <button class="edit-btn" onclick="openEditModal(${r.id})" title="Изменить">✏️</button>
+          <button class="del-btn" onclick="deleteReminder(${r.id})" title="Удалить">✕</button>
         </div>
       </div>
-      <button class="edit-btn" onclick="openEditModal(${r.id})" title="Изменить">✏️</button>
-      <button class="del-btn" onclick="deleteReminder(${r.id})" title="Удалить">✕</button>
+
+      <div style="${rowStyle}">
+        <span style="${leftStyle}">${fmtDT(r.date,r.time)}</span>
+        <span style="${rightStyle}"><span class="badge ${cdCls} countdown" id="cd-${r.id}" style="${badgeT}"></span></span>
+      </div>
+
+      <div style="${rowStyle}">
+        <span style="${leftStyle}"></span>
+        <span style="${rightStyle}"><span class="badge bl" style="${badgeT}">напомнить ${blabel(r.before)}</span></span>
+      </div>
+
+      ${r.repeat?`<div style="${rowStyle}">
+        <span style="${leftStyle}"></span>
+        <span style="${rightStyle}"><span class="badge bp" style="${badgeT}">🔁 ${rlabel(r.repeat)}</span></span>
+      </div>`:''}
+
+      ${r.note?`<div style="${rowStyle};margin-top:2px">
+        <span style="${leftStyle};white-space:pre-wrap;max-width:100%">${esc(r.note)}</span>
+      </div>`:''}
+
+      ${r.address?`<div style="${rowStyle};margin-top:4px">
+        <span style="${leftStyle}">📍 ${esc(r.address)}</span>
+        <span style="${rightStyle}">
+          <a class="nav-btn nav-btn-map" href="https://maps.google.com/?q=${encodeURIComponent(r.address)}" target="_blank" style="${T}">🗺 Map</a>
+          <a class="nav-btn nav-btn-sbb" href="https://www.sbb.ch/de/kaufen/pages/fahrplan/fahrplan.xhtml?nach=${encodeURIComponent(r.address)}" target="_blank" style="${T}">🚆 SBB</a>
+        </span>
+      </div>`:''}
+
+      ${r.phone?`<div style="${rowStyle};margin-top:4px">
+        <span style="${leftStyle}">📞 ${esc(r.phone)}</span>
+        <span style="${rightStyle}">
+          <a class="nav-btn nav-btn-call" href="tel:${encodeURIComponent(r.phone)}" style="${T}">📞 Позвонить</a>
+        </span>
+      </div>`:''}
     </div>`;
   }).join('');
 }
