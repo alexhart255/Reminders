@@ -137,6 +137,18 @@
   .edit-sound-dd{display:none;border:.5px solid var(--border);border-radius:var(--r);padding:10px;display:none;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
   .edit-sound-dd.open{display:grid}
   @media(max-width:400px){.edit-sound-dd{grid-template-columns:repeat(3,1fr)}}
+
+  .nav-btns{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+  .nav-btn{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;border:.5px solid;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;transition:opacity .15s;white-space:nowrap}
+  .nav-btn:hover{opacity:.8}
+  .nav-btn-map{background:#e6f3e6;color:#1a7a1a;border-color:#9fd09f}
+  .nav-btn-sbb{background:#feecec;color:#c0392b;border-color:#f5a9a9}
+  @media(prefers-color-scheme:dark){
+    .nav-btn-map{background:#0d2e0d;color:#7dd87d;border-color:#2a6b2a}
+    .nav-btn-sbb{background:#3b0808;color:#f5a9a9;border-color:#8b2020}
+  }
+  .ri-address{font-size:12px;color:var(--muted);margin-top:3px;display:flex;align-items:flex-start;gap:4px}
+  .ri-address-icon{flex-shrink:0;margin-top:1px}
   /* Excel Calendar Modal */
   #xcal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1200;align-items:center;justify-content:center;padding:0.5rem}
   #xcal-ov.show{display:flex}
@@ -257,7 +269,8 @@
       </div>
     </div>
     <div class="frow"><div class="field"><label>Название / причина</label><input type="text" id="inp-title" placeholder="Например: Приём у врача"></div></div>
-    <div class="frow"><div class="field"><label>Заметка (необязательно)</label><textarea id="inp-note" placeholder="Адрес, номер кабинета, что взять с собой..."></textarea></div></div>
+    <div class="frow"><div class="field"><label>Заметка (необязательно)</label><textarea id="inp-note" placeholder="Номер кабинета, что взять с собой..."></textarea></div></div>
+    <div class="frow"><div class="field"><label>Адрес (необязательно)</label><input type="text" id="inp-address" placeholder="Например: Zürich, Bahnhofstrasse 1"></div></div>
     <div class="frow">
       <div class="field">
         <label style="font-size:13px;color:var(--muted);font-weight:500">Фото (необязательно)</label>
@@ -404,6 +417,7 @@
     </div>
     <div class="frow"><div class="field"><label>Название</label><input type="text" id="edit-title"></div></div>
     <div class="frow"><div class="field"><label>Заметка</label><textarea id="edit-note" style="min-height:52px"></textarea></div></div>
+    <div class="frow"><div class="field"><label>Адрес</label><input type="text" id="edit-address" placeholder="Например: Zürich, Bahnhofstrasse 1"></div></div>
     <div class="frow">
       <div class="field">
         <label style="font-size:13px;color:var(--muted);font-weight:500">Фото</label>
@@ -590,6 +604,7 @@ async function dbLoad(){
         alertMs:x.alert_ms,eventMs:x.event_ms,fired:firedLocal||(x.fired||false),
         sound:x.sound||'silent',repeatCount:x.repeat_count||0,photo:x.photo||null,
         priority:x.priority||'none',
+        address:x.address||getCachedAddress(x.id),
         completedOccurrences:x.completed_occurrences?JSON.parse(x.completed_occurrences):[]
       };
     });
@@ -637,7 +652,7 @@ async function dbLoad(){
 }
 
 async function dbSave(r){
-  const row={id:r.id,date:r.date,time:r.time,title:r.title,note:r.note,photo:r.photo||null,
+  const row={id:r.id,date:r.date,time:r.time,title:r.title,note:r.note,address:r.address||'',photo:r.photo||null,
     before:r.before,repeat:r.repeat,repeat_until:r.repeatUntil,
     alert_ms:r.alertMs,event_ms:r.eventMs,fired:r.fired,
     sound:r.sound,repeat_count:r.repeatCount||0,priority:r.priority||'none'};
@@ -667,6 +682,23 @@ async function dbDelete(id){
       method:'DELETE',headers:SUPA_HEADERS
     });
   }catch(e){console.warn('Supabase delete error:',e);}
+}
+
+
+// ─── Address cache (localStorage fallback) ───────────────────────────────────
+function cacheAddress(id, address){
+  if(!address){return;}
+  try{
+    const c=JSON.parse(localStorage.getItem('addr_cache')||'{}');
+    c[String(id)]=address;
+    localStorage.setItem('addr_cache',JSON.stringify(c));
+  }catch(e){}
+}
+function getCachedAddress(id){
+  try{
+    const c=JSON.parse(localStorage.getItem('addr_cache')||'{}');
+    return c[String(id)]||'';
+  }catch(e){return '';}
 }
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -915,18 +947,21 @@ function addReminder(){
   const time=(h&&m)?`${h}:${m}`:'';
   const title=document.getElementById('inp-title').value.trim();
   const note=document.getElementById('inp-note').value.trim();
+  const address=document.getElementById('inp-address').value.trim();
   const before=parseInt(document.getElementById('inp-before').value);
   const repeat=parseInt(document.getElementById('inp-repeat').value);
   const repeatUntil=parseInt(document.getElementById('inp-repeat-until').value);
   if(!date||!time||!title){alert('Пожалуйста, заполните дату, время и название.');return;}
   const eventMs=new Date(date+'T'+time).getTime();
   const alertMs=eventMs-before*60000;
-  const nr={id:Date.now(),date,time,title,note,photo:window._inpPhoto||null,before,eventMs,alertMs,sound:selectedSound,fired:false,repeat,repeatUntil,repeatCount:0,priority:selectedPriority};
+  const nr={id:Date.now(),date,time,title,note,address,photo:window._inpPhoto||null,before,eventMs,alertMs,sound:selectedSound,fired:false,repeat,repeatUntil,repeatCount:0,priority:selectedPriority};
+  if(address) cacheAddress(nr.id, address);
   reminders.push(nr);
   reminders.sort((a,b)=>a.eventMs-b.eventMs);
   dbSave(nr);render();
   document.getElementById('inp-title').value='';
   document.getElementById('inp-note').value='';
+  document.getElementById('inp-address').value='';
   clearInpPhoto();
   selectPriority('none');
   if(ddOpen) toggleDD();
@@ -1180,6 +1215,12 @@ function render(){
               </div>
             </div>
             ${r.note?`<div class="ri-note">${esc(r.note)}</div>`:''}
+            ${r.address?`
+              <div class="ri-address"><span class="ri-address-icon">📍</span><span>${esc(r.address)}</span></div>
+              <div class="nav-btns">
+                <a class="nav-btn nav-btn-map" href="https://maps.google.com/?q=${encodeURIComponent(r.address)}" target="_blank">🗺 Map</a>
+                <a class="nav-btn nav-btn-sbb" href="https://www.sbb.ch/de/kaufen/pages/fahrplan/fahrplan.xhtml?nach=${encodeURIComponent(r.address)}" target="_blank">🚆 SBB</a>
+              </div>`:''}
 
           </div>
           <div class="ri-badges">
@@ -1254,6 +1295,7 @@ function openEditModal(id){
   document.getElementById('edit-date').value=r.date;
   document.getElementById('edit-title').value=r.title;
   document.getElementById('edit-note').value=r.note||'';
+  document.getElementById('edit-address').value=r.address||'';
   // Time
   const [h,m]=r.time.split(':');
   document.getElementById('edit-time-h').value=h;
@@ -1303,17 +1345,19 @@ async function saveEdit(){
   const repeat=parseInt(document.getElementById('edit-repeat').value);
   const repeatUntil=parseInt(document.getElementById('edit-repeat-until').value);
   const note=document.getElementById('edit-note').value.trim();
+  const address=document.getElementById('edit-address').value.trim();
   const eventMs=new Date(date+'T'+time).getTime();
   const alertMs=eventMs-before*60000;
-  r.date=date; r.time=time; r.title=title; r.note=note;
+  r.date=date; r.time=time; r.title=title; r.note=note; r.address=address;
   r.before=before; r.repeat=repeat; r.repeatUntil=repeatUntil;
   r.eventMs=eventMs; r.alertMs=alertMs;
   r.sound=editSelectedSound; r.priority=editSelectedPriority;
   r.photo=window._editPhoto||null;
   r.fired=false; r.repeatCount=0;
+  cacheAddress(r.id, address);
   reminders.sort((a,b)=>a.eventMs-b.eventMs);
   // Save full row to Supabase
-  const row={id:r.id,date:r.date,time:r.time,title:r.title,note:r.note,photo:r.photo||null,
+  const row={id:r.id,date:r.date,time:r.time,title:r.title,note:r.note,address:r.address||'',photo:r.photo||null,
     before:r.before,repeat:r.repeat,repeat_until:r.repeatUntil,
     alert_ms:r.alertMs,event_ms:r.eventMs,fired:r.fired,
     sound:r.sound,repeat_count:r.repeatCount,priority:r.priority};
