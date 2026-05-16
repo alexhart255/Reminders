@@ -244,6 +244,7 @@
         <label>Повторять после срабатывания</label>
         <select id="inp-repeat">
           <option value="0">Не повторять</option>
+          <option value="-1">пн–пт каждый день 📅</option>
           <option value="5">каждые 5 мин</option>
           <option value="10">каждые 10 мин</option>
           <option value="15">каждые 15 мин</option>
@@ -394,6 +395,7 @@
       <div class="field"><label>Повторять</label>
         <select id="edit-repeat">
           <option value="0">Не повторять</option>
+          <option value="-1">пн–пт каждый день 📅</option>
           <option value="5">каждые 5 мин</option>
           <option value="10">каждые 10 мин</option>
           <option value="15">каждые 15 мин</option>
@@ -620,7 +622,7 @@ async function dbLoad(){
     const padL = n => String(n).padStart(2,'0');
     let needSync = false;
     reminders.forEach(r=>{
-      if(r.repeat && r.repeat>0 && !r.fired && r.eventMs < nowMs) {
+      if(r.repeat && r.repeat!==0 && !r.fired && r.eventMs < nowMs) {
         let nextMs = r.eventMs;
         let curMs = r.eventMs;
         // Прокручиваем вперёд пока не окажемся в будущем, сохраняя пропущенные вхождения
@@ -635,7 +637,12 @@ async function dbLoad(){
             r.completedOccurrences.push({date:occDate,time:occTime,eventMs:curMs});
           }
           curMs = nextMs;
-          if(r.repeat === 43200) {
+          if(r.repeat === -1) {
+            // пн–пт: прибавляем 1 день, пропускаем сб/вс
+            const nd = new Date(nextMs); nd.setDate(nd.getDate()+1);
+            for(let s=0;s<7;s++){ const wd=nd.getDay(); if(wd!==0&&wd!==6) break; nd.setDate(nd.getDate()+1); }
+            nextMs = nd.getTime();
+          } else if(r.repeat === 43200) {
             const nd = new Date(nextMs); nd.setMonth(nd.getMonth()+1); nextMs = nd.getTime();
           } else if(r.repeat === 525600) {
             const nd = new Date(nextMs); nd.setFullYear(nd.getFullYear()+1); nextMs = nd.getTime();
@@ -1080,7 +1087,7 @@ function dismissCurrent(){
     const r=reminders.find(x=>x.id===currentAlarmId);
     if(r){
       // Проверяем нужно ли повторить
-      if(r.repeat && r.repeat > 0 && !r.fired){
+      if(r.repeat && r.repeat !== 0 && !r.fired){
         r.repeatCount = (r.repeatCount||0) + 1;
         const maxRepeats = r.repeatUntil || 0;
         if(maxRepeats === 0 || r.repeatCount < maxRepeats){
@@ -1090,7 +1097,12 @@ function dismissCurrent(){
 
           let nextMs;
           const pad = n => String(n).padStart(2,'0');
-          if(r.repeat === 43200) {
+          if(r.repeat === -1) {
+            // пн–пт: следующий рабочий день
+            const nd = new Date(r.eventMs); nd.setDate(nd.getDate()+1);
+            for(let s=0;s<7;s++){ const wd=nd.getDay(); if(wd!==0&&wd!==6) break; nd.setDate(nd.getDate()+1); }
+            nextMs = nd.getTime();
+          } else if(r.repeat === 43200) {
             // Каждый месяц — прибавляем 1 месяц по календарю
             const nd = new Date(r.eventMs);
             nd.setMonth(nd.getMonth() + 1);
@@ -1146,7 +1158,7 @@ function checkAlarms(){
 // ─── Render ───────────────────────────────────────────────────────────────────
 function fmtDT(date,time){const[y,m,d]=date.split('-');return`${d}.${m}.${y} в ${time}`;}
 function blabel(b){if(b===0)return'в само время';if(b<60)return`за ${b} мин`;if(b<1440)return`за ${b/60} ч`;return`за ${b/1440} д`;}
-function rlabel(r){if(r<60)return`каждые ${r} мин`;if(r===60)return'каждый час';if(r<1440)return`каждые ${r/60} ч`;if(r===43200)return'каждый месяц';if(r===525600)return'каждый год';if(r===1440)return'каждый день';if(r%1440===0)return`каждые ${r/1440} дн.`;return'каждый день';}
+function rlabel(r){if(r===-1)return'пн–пт каждый день';if(r<60)return`каждые ${r} мин`;if(r===60)return'каждый час';if(r<1440)return`каждые ${r/60} ч`;if(r===43200)return'каждый месяц';if(r===525600)return'каждый год';if(r===1440)return'каждый день';if(r%1440===0)return`каждые ${r/1440} дн.`;return'каждый день';}
 function stInfo(r){
   const now=Date.now();
   if(r.fired&&r.eventMs>now) return['Получено','bg'];
@@ -1477,6 +1489,29 @@ function renderCalResults(){
     }
     // Для повторяющихся — ищем попадание в нужный месяц/год
     if(!r.repeat || r.repeat===0) return;
+    // пн–пт: перебираем каждый рабочий день в целевом месяце
+    if(r.repeat === -1) {
+      const baseD2=new Date(r.date+'T'+r.time);
+      // Все рабочие дни целевого месяца начиная с базовой даты
+      const startOfMonth = new Date(year, month, 1);
+      const endOfMonth = new Date(year, month+1, 0);
+      const startFrom = baseD2 > startOfMonth ? baseD2 : startOfMonth;
+      let cur2 = new Date(startFrom);
+      // Если базовая дата позже конца месяца — ничего не показываем
+      if(baseD2 > endOfMonth) return;
+      // Убеждаемся что cur2 — рабочий день
+      for(let s=0;s<7;s++){ const wd=cur2.getDay(); if(wd!==0&&wd!==6) break; cur2.setDate(cur2.getDate()+1); }
+      // Добавляем все рабочие дни месяца
+      while(cur2 <= endOfMonth) {
+        const wd=cur2.getDay();
+        if(wd!==0&&wd!==6){
+          const ds=`${cur2.getFullYear()}-${pad(cur2.getMonth()+1)}-${pad(cur2.getDate())}`;
+          items.push({r, displayDate:ds, displayMs:cur2.getTime()});
+        }
+        cur2.setDate(cur2.getDate()+1);
+      }
+      return;
+    }
     // Повторы меньше 1 дня (< 1440 мин) — временные, не транслируем на другие годы
     if(r.repeat < 1440) return;
     // Умный прыжок сразу к нужному периоду вместо перебора по одному
