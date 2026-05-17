@@ -91,6 +91,8 @@
   .br{background:var(--red-bg);color:var(--red-t);border-color:var(--red-b)}
   .bg{background:var(--green-bg);color:var(--green-t);border-color:var(--green-b)}
   .bp{background:var(--purple-bg);color:var(--purple-t);border-color:var(--purple-b)}
+  .by{background:rgba(255,214,0,.15);color:#c8a200;border-color:rgba(255,214,0,.5);font-weight:600}
+  @media(prefers-color-scheme:dark){.by{background:rgba(255,214,0,.13);color:#ffd600;border-color:rgba(255,214,0,.4)}}
   .bl{background:#4a1a5c;color:#e0a0f5;border-color:#8b3dbf}
   .del-btn{background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;padding:4px 6px;border-radius:var(--rs);flex-shrink:0;line-height:1;transition:background .15s,color .15s}
   .del-btn:hover{background:var(--red-bg);color:var(--red-t)}
@@ -1192,7 +1194,7 @@ function updateCountdowns(){
     const el=document.getElementById('cd-'+r.id);
     if(!el) return;
     if(r.fired||r.eventMs<now){
-      el.textContent=r.eventMs<now?'Прошло':'Получено';
+      el.textContent='✓ Выполнено';
       return;
     }
     const diff=r.eventMs-now;
@@ -1210,7 +1212,7 @@ function render(){
   const todayStartMs=todayStart.getTime();
   const todayEndMs=todayEnd.getTime();
   const visibleReminders=reminders.filter(r=>{
-    if(r.fired) return false;
+    // Показываем все напоминания за сегодня — включая выполненные — до конца дня
     return (r.eventMs>=todayStartMs && r.eventMs<=todayEndMs) ||
            (r.alertMs>=todayStartMs && r.alertMs<=todayEndMs) ||
            (r.alertMs<now7 && r.eventMs>=todayStartMs);
@@ -1221,7 +1223,7 @@ function render(){
     const m=soundMeta(r.sound);
     const ringing=currentAlarmId===r.id;
     const now2=Date.now();
-    const cdCls=r.fired?'bg':r.eventMs<now2?'br':r.alertMs-now2<0?'ba':'bb';
+    const cdCls=(r.fired||r.eventMs<now2)?'by':r.alertMs-now2<0?'ba':'bb';
     const prioColors={red:'#e24b4a',amber:'#f0a820',green:'#4caf50',none:''};
     const prioStyle=r.priority&&r.priority!=='none'?`color:${prioColors[r.priority]}`:'';
     const T='font-size:14px;font-weight:400;color:var(--text)';
