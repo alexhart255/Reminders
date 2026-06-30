@@ -153,37 +153,11 @@
   }
   .ri-address{font-size:12px;color:var(--muted);margin-top:3px;display:flex;align-items:flex-start;gap:4px}
   .ri-address-icon{flex-shrink:0;margin-top:1px}
-  /* Excel Calendar Modal */
-  #xcal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1200;align-items:center;justify-content:center;padding:0.5rem}
-  #xcal-ov.show{display:flex}
-  .xcal-box{background:var(--surface);border-radius:var(--r);padding:1.5rem;max-width:100%;width:100%;height:99vh;max-height:99vh;overflow-y:auto;border:.5px solid var(--border);display:flex;flex-direction:column}
-  .xcal-box h2{font-size:17px;font-weight:600;margin-bottom:1rem}
-  .xcal-upload-zone{border:.5px dashed var(--border-h);border-radius:var(--rs);padding:20px 16px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;font-size:14px;color:var(--muted);margin-bottom:1rem}
-  .xcal-upload-zone:hover{border-color:var(--accent);background:var(--blue-bg);color:var(--blue-t)}
-  .xcal-upload-zone.loading{border-color:var(--amber-b);background:var(--amber-bg);color:var(--amber-t);cursor:default}
-  .xcal-upload-zone.ok{border-style:solid;border-color:var(--green-b);background:var(--green-bg);color:var(--green-t)}
-  .xcal-file-card{background:var(--bg);border:.5px solid var(--border);border-radius:var(--rs);padding:14px 16px;display:flex;align-items:center;gap:12px;margin-bottom:1rem}
-  .xcal-file-info{flex:1;min-width:0}
-  .xcal-file-name{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .xcal-file-meta{font-size:12px;color:var(--muted);margin-top:2px}
-  .xcal-actions{display:flex;gap:8px;flex-wrap:wrap}
-  .xcal-hint{font-size:12px;color:var(--muted);text-align:center;margin-top:.5rem}
-  /* Excel preview */
-  
-  .xcal-preview{margin-top:1rem}
-  .xcal-sheet-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
-  .xcal-tab{font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;padding:5px 12px;border:.5px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;background:var(--bg);color:var(--muted);transition:background .15s,color .15s;border-bottom:none}
-  .xcal-tab.active{background:var(--surface);color:var(--text);border-color:var(--accent);border-bottom-color:var(--surface)}
-  .xcal-table-wrap{overflow:auto;flex:1;max-height:calc(99vh - 180px);border:.5px solid var(--border);border-radius:0 var(--rs) var(--rs) var(--rs)}
-  .xcal-table{border-collapse:collapse;font-size:12px;white-space:nowrap;min-width:100%}
-  .xcal-table th{font-weight:600;padding:6px 10px;border:.5px solid var(--border);position:sticky;top:0;z-index:1;font-size:11px}
-  .xcal-table td{padding:5px 10px;border:.5px solid var(--border);max-width:220px;overflow:hidden;text-overflow:ellipsis}
-  .xcal-preview-loading{text-align:center;padding:1.5rem;color:var(--muted);font-size:13px}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>🔔 Напоминания <button class="btn" style="margin-left:auto;font-size:13px;padding:6px 14px" onclick="openCalModal()">📅 По месяцам</button> <button class="btn" style="font-size:13px;padding:6px 14px" onclick="openXCalModal()">📊 Таблица</button></h1>
+  <h1>🔔 Напоминания <button class="btn" style="margin-left:auto;font-size:13px;padding:6px 14px" onclick="openCalModal()">📅 По месяцам</button></h1>
   <div class="card">
     <div class="fg">
       <div class="field"><label>Дата</label><input type="date" id="inp-date"></div>
@@ -466,7 +440,23 @@
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+// ─── Firebase ─────────────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyBOX2iGOYXRkN7nmu7dRMJINVmkEtUf6C0",
+  authDomain: "erinnerungen-41426.firebaseapp.com",
+  projectId: "erinnerungen-41426",
+  storageBucket: "erinnerungen-41426.firebasestorage.app",
+  messagingSenderId: "47088177028",
+  appId: "1:47088177028:web:397798e5939577106597d1",
+  measurementId: "G-WV51Y1740T"
+};
+firebase.initializeApp(firebaseConfig);
+const fsDB = firebase.firestore();
+const remindersCol = fsDB.collection('reminders');
+</script>
 <script>
 // ─── Built-in sounds ─────────────────────────────────────────────────────────
 const BUILTINS=[
@@ -592,18 +582,12 @@ async function idbDelete(id){
   });
 }
 
-// ─── Supabase ─────────────────────────────────────────────────────────────────
-const SUPA_URL='https://lboflhhaufrzmetbvqnk.supabase.co';
-const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxib2ZsaGhhdWZyem1ldGJ2cW5rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5Mzg2ODMsImV4cCI6MjA5MTUxNDY4M30.JjEi930_YwaylNG4-Bwbt6TkJHiyUbaeH_ombXTyc8c';
-const SUPA_HEADERS={'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY};
-const XCAL_BUCKET='calendar';
-const XCAL_FILE_PATH='kalender.xlsx';
+// ─── Firestore data layer ─────────────────────────────────────────────────────
 
 async function dbLoad(){
   try{
-    const r=await fetch(SUPA_URL+'/rest/v1/Reminders?order=alert_ms.asc',{headers:{...SUPA_HEADERS,'Cache-Control':'no-cache','Pragma':'no-cache'},cache:'no-store'});
-    const rows=await r.json();
-    if(!Array.isArray(rows)) return;
+    const snap=await remindersCol.orderBy('alert_ms','asc').get();
+    const rows=snap.docs.map(d=>{ const v=d.data(); v.id=Number(d.id); return v; });
     reminders=rows.map(x=>{
       // Сохраняем локальный fired=true — не даём базе его перезаписать
       const existing=reminders.find(r=>r.id===x.id);
@@ -664,21 +648,18 @@ async function dbLoad(){
     });
     // Не вызываем render во время звонка — это не прерывает аудио
     if(currentAlarmId===null) render();
-  }catch(e){console.warn('Supabase load error:',e);}
+  }catch(e){console.warn('Firestore load error:',e);}
 }
 
 async function dbSave(r){
-  const row={id:r.id,date:r.date,time:r.time,title:r.title,note:r.note,address:r.address||'',phone:r.phone||'',photo:r.photo||null,
+  const row={date:r.date,time:r.time,title:r.title,note:r.note,address:r.address||'',phone:r.phone||'',photo:r.photo||null,
     before:r.before,repeat:r.repeat,repeat_until:r.repeatUntil,
     alert_ms:r.alertMs,event_ms:r.eventMs,fired:r.fired,
-    sound:r.sound,repeat_count:r.repeatCount||0,priority:r.priority||'none'};
+    sound:r.sound,repeat_count:r.repeatCount||0,priority:r.priority||'none',
+    completed_occurrences:r.completedOccurrences?JSON.stringify(r.completedOccurrences):null};
   try{
-    await fetch(SUPA_URL+'/rest/v1/Reminders',{
-      method:'POST',
-      headers:{...SUPA_HEADERS,'Prefer':'resolution=merge-duplicates'},
-      body:JSON.stringify(row)
-    });
-  }catch(e){console.warn('Supabase save error:',e);}
+    await remindersCol.doc(String(r.id)).set(row,{merge:true});
+  }catch(e){console.warn('Firestore save error:',e);}
 }
 
 async function dbUpdate(r){
@@ -686,18 +667,14 @@ async function dbUpdate(r){
     date:r.date,time:r.time,repeat_count:r.repeatCount||0,priority:r.priority||'none',photo:r.photo||null,
     completed_occurrences:r.completedOccurrences?JSON.stringify(r.completedOccurrences):null};
   try{
-    await fetch(SUPA_URL+'/rest/v1/Reminders?id=eq.'+r.id,{
-      method:'PATCH',headers:SUPA_HEADERS,body:JSON.stringify(row)
-    });
-  }catch(e){console.warn('Supabase update error:',e);}
+    await remindersCol.doc(String(r.id)).set(row,{merge:true});
+  }catch(e){console.warn('Firestore update error:',e);}
 }
 
 async function dbDelete(id){
   try{
-    await fetch(SUPA_URL+'/rest/v1/Reminders?id=eq.'+id,{
-      method:'DELETE',headers:SUPA_HEADERS
-    });
-  }catch(e){console.warn('Supabase delete error:',e);}
+    await remindersCol.doc(String(id)).delete();
+  }catch(e){console.warn('Firestore delete error:',e);}
 }
 
 
@@ -937,7 +914,7 @@ function selectSound(id){
 }
 
 // ─── Reminders ────────────────────────────────────────────────────────────────
-function save(){} // данные сохраняются в Supabase
+function save(){} // данные сохраняются в Firestore
 
 function selectPriority(p){
   selectedPriority=p;
@@ -1211,13 +1188,8 @@ function render(){
   const todayEnd=new Date(); todayEnd.setHours(23,59,59,999);
   const todayStartMs=todayStart.getTime();
   const todayEndMs=todayEnd.getTime();
-  const visibleReminders=reminders.filter(r=>{
-    // Показываем все напоминания за сегодня — включая выполненные — до конца дня
-    return (r.eventMs>=todayStartMs && r.eventMs<=todayEndMs) ||
-           (r.alertMs>=todayStartMs && r.alertMs<=todayEndMs) ||
-           (r.alertMs<now7 && r.eventMs>=todayStartMs);
-  });
-  if(!visibleReminders.length){list.innerHTML='<div class="empty">На сегодня напоминаний нет</div>';return;}
+  const visibleReminders=reminders;
+  if(!visibleReminders.length){list.innerHTML='<div class="empty">Напоминаний пока нет</div>';return;}
   visibleReminders.sort((a,b)=>a.eventMs-b.eventMs);
   list.innerHTML=visibleReminders.map(r=>{
     const m=soundMeta(r.sound);
@@ -1402,18 +1374,8 @@ async function saveEdit(){
   r.fired=false; r.repeatCount=0;
   cacheAddress(r.id, address);
   reminders.sort((a,b)=>a.eventMs-b.eventMs);
-  // Save full row to Supabase
-  const row={id:r.id,date:r.date,time:r.time,title:r.title,note:r.note,address:r.address||'',phone:r.phone||'',photo:r.photo||null,
-    before:r.before,repeat:r.repeat,repeat_until:r.repeatUntil,
-    alert_ms:r.alertMs,event_ms:r.eventMs,fired:r.fired,
-    sound:r.sound,repeat_count:r.repeatCount,priority:r.priority};
-  try{
-    await fetch(SUPA_URL+'/rest/v1/Reminders',{
-      method:'POST',
-      headers:{...SUPA_HEADERS,'Prefer':'resolution=merge-duplicates'},
-      body:JSON.stringify(row)
-    });
-  }catch(e){console.warn('Supabase update error:',e);}
+  // Save full row to Firestore
+  await dbSave(r);
   closeEditModal();
   await dbLoad();
   updateCountdowns();
@@ -1672,287 +1634,6 @@ function closeLightbox(){
 }
 document.addEventListener('keydown',function(e){if(e.key==='Escape') closeLightbox();});
 
-// ─── Excel Calendar (Supabase Storage) ───────────────────────────────────────
-async function xcalGetFileInfo() {
-  try {
-    const r = await fetch(
-      SUPA_URL + '/storage/v1/object/info/public/' + XCAL_BUCKET + '/' + XCAL_FILE_PATH,
-      { headers: SUPA_HEADERS }
-    );
-    if (!r.ok) return null;
-    return await r.json();
-  } catch(e) { return null; }
-}
-
-async function xcalUpload(file) {
-  const zone = document.getElementById('xcal-upload-zone');
-  zone.className = 'xcal-upload-zone loading';
-  zone.innerHTML = '⏳ Загружаю файл...';
-  try {
-    // Удаляем старый файл если есть
-    await fetch(
-      SUPA_URL + '/storage/v1/object/' + XCAL_BUCKET + '/' + XCAL_FILE_PATH,
-      { method: 'DELETE', headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY } }
-    );
-    // Загружаем новый
-    const uploadHeaders = {
-      'apikey': SUPA_KEY,
-      'Authorization': 'Bearer ' + SUPA_KEY,
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'x-upsert': 'true'
-    };
-    const r = await fetch(
-      SUPA_URL + '/storage/v1/object/' + XCAL_BUCKET + '/' + XCAL_FILE_PATH,
-      { method: 'POST', headers: uploadHeaders, body: file }
-    );
-    if (!r.ok) {
-      const err = await r.text();
-      throw new Error(err);
-    }
-    zone.className = 'xcal-upload-zone ok';
-    zone.innerHTML = '✅ Файл успешно загружен!';
-    setTimeout(() => renderXCalModal(), 1500);
-  } catch(e) {
-    console.error('xcal upload error:', e);
-    zone.className = 'xcal-upload-zone';
-    zone.innerHTML = '❌ Ошибка загрузки: ' + e.message + '<br><small>Нажмите чтобы попробовать снова</small>';
-  }
-}
-
-async function xcalPreview() {
-  const previewEl = document.getElementById('xcal-preview-area');
-  if (!previewEl) return;
-  previewEl.innerHTML = '<div class="xcal-preview-loading">⏳ Загружаю таблицу...</div>';
-  previewEl.style.display = 'block';
-  try {
-    const url = SUPA_URL + '/storage/v1/object/public/' + XCAL_BUCKET + '/' + XCAL_FILE_PATH;
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error('Не удалось загрузить файл');
-    const arrayBuffer = await resp.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true, cellStyles: true });
-    window._xcalWorkbook = workbook;
-    window._xcalActiveSheet = workbook.SheetNames[0];
-    renderXCalTable(previewEl);
-  } catch(e) {
-    previewEl.innerHTML = '<div class="xcal-preview-loading" style="color:var(--red-t)">❌ Ошибка: ' + e.message + '</div>';
-  }
-}
-
-function xcalArgbToHex(argb) {
-  if (!argb || typeof argb !== 'string') return null;
-  // SheetJS returns either 6-char RGB or 8-char ARGB
-  const hex = argb.length === 8 ? argb.slice(2) : argb;
-  if (hex.length !== 6) return null;
-  if (/^(FFFFFF|ffffff|000000)$/i.test(hex)) return null;
-  return '#' + hex;
-}
-
-function xcalGetCellStyle(ws, col, row) {
-  const addr = XLSX.utils.encode_cell({ c: col, r: row });
-  const cell = ws[addr];
-  if (!cell || !cell.s) return '';
-  let style = '';
-  const s = cell.s;
-
-  // SheetJS with cellStyles:true stores fill as: s.patternType + s.fgColor + s.bgColor
-  // Only apply fgColor as background when patternType is 'solid'
-  let bgHex = null;
-  if (s.patternType === 'solid' || s.patternType === undefined) {
-    if (!bgHex && s.fgColor) bgHex = xcalArgbToHex(s.fgColor.rgb || s.fgColor.argb);
-    if (!bgHex && s.bgColor && s.bgColor.rgb && s.bgColor.rgb !== '000000') bgHex = xcalArgbToHex(s.bgColor.rgb || s.bgColor.argb);
-    // nested fill object fallback
-    if (!bgHex && s.fill && s.fill.fgColor) bgHex = xcalArgbToHex(s.fill.fgColor.rgb || s.fill.fgColor.argb);
-  }
-  if (bgHex) style += 'background:' + bgHex + ';';
-
-  // Font color
-  const fontColor = (s.font && s.font.color) || s.color;
-  if (fontColor) {
-    const fhex = xcalArgbToHex(fontColor.rgb || fontColor.argb);
-    if (fhex) style += 'color:' + fhex + ';';
-  }
-
-  // Bold
-  if (s.bold || (s.font && s.font.bold)) style += 'font-weight:600;';
-
-  return style;
-}
-
-function xcalGetRowWeekdayStyle(ws, range, sheetRow, numCols) {
-  // Ищем ячейку с датой в строке (тип Date или строка вида DD.MM.YYYY / YYYY-MM-DD)
-  for (let ci = 0; ci < numCols; ci++) {
-    const addr = XLSX.utils.encode_cell({ c: range.s.c + ci, r: sheetRow });
-    const cell = ws[addr];
-    if (!cell) continue;
-    let d = null;
-    if (cell.v instanceof Date) {
-      d = cell.v;
-    } else if (cell.t === 'n' && cell.v > 0) {
-      // Excel serial date number — SheetJS с cellDates:true обычно уже парсит,
-      // но на всякий случай:
-      const excelEpoch = new Date(1899, 11, 30);
-      d = new Date(excelEpoch.getTime() + cell.v * 86400000);
-    } else if (typeof cell.v === 'string') {
-      // Форматы: "01.01.2026" или "2026-01-01"
-      const m1 = cell.v.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
-      const m2 = cell.v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-      if (m1) d = new Date(+m1[3], +m1[2]-1, +m1[1]);
-      else if (m2) d = new Date(+m2[1], +m2[2]-1, +m2[3]);
-    }
-    if (d && !isNaN(d.getTime())) {
-      const dow = d.getDay(); // 0=Вс, 6=Сб
-      if (dow === 6) return 'background:#DAE9F8;color:#1a1a1a;'; // суббота — голубой
-      if (dow === 0) return 'background:#C1F0C8;color:#1a1a1a;'; // воскресенье — зелёный
-      return '';
-    }
-  }
-  return '';
-}
-
-function renderXCalTable(container) {
-  const wb = window._xcalWorkbook;
-  if (!wb) return;
-  const sheetName = window._xcalActiveSheet;
-  const ws = wb.Sheets[sheetName];
-  const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', cellDates: true });
-
-  // Tabs
-  let tabsHtml = '<div class="xcal-sheet-tabs">';
-  wb.SheetNames.forEach(name => {
-    const active = name === sheetName ? ' active' : '';
-    tabsHtml += `<button class="xcal-tab${active}" onclick="window._xcalActiveSheet='${name.replace(/'/g,"\\'")}';renderXCalTable(document.getElementById('xcal-preview-area'))">${name}</button>`;
-  });
-  tabsHtml += '</div>';
-
-  if (!data.length) {
-    container.innerHTML = tabsHtml + '<div class="xcal-preview-loading">Лист пустой</div>';
-    return;
-  }
-
-  // Get sheet range to know actual column count
-  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-  const numCols = range.e.c - range.s.c + 1;
-  const colIndices = Array.from({ length: numCols }, (_, i) => i);
-
-  let tableHtml = '<div class="xcal-table-wrap"><table class="xcal-table"><thead><tr>';
-  // Header row (row index 0 in data = sheet row range.s.r)
-  colIndices.forEach(ci => {
-    const addr = XLSX.utils.encode_cell({ c: range.s.c + ci, r: range.s.r });
-    const cell = ws[addr];
-    const val = cell ? (cell.v !== undefined ? cell.v : '') : '';
-    const st = xcalGetCellStyle(ws, range.s.c + ci, range.s.r);
-    const thDefault = st ? (st.includes('color:') ? '' : 'color:var(--muted);') : 'background:var(--bg);color:var(--muted);';
-    tableHtml += `<th style="${thDefault}${st}">${val !== '' ? val : '&nbsp;'}</th>`;
-  });
-  tableHtml += '</tr></thead><tbody>';
-
-  for (let ri = 1; ri < data.length; ri++) {
-    const row = data[ri];
-    if (row.every(c => c === '' || c === null || c === undefined)) continue;
-    const sheetRow = range.s.r + ri;
-
-    // Fallback-цвет строки по дню недели (используется если у ячейки нет своего фона из Excel)
-    const weekdayRowStyle = xcalGetRowWeekdayStyle(ws, range, sheetRow, numCols);
-
-    tableHtml += '<tr>';
-    colIndices.forEach(ci => {
-      const sheetCol = range.s.c + ci;
-      const addr = XLSX.utils.encode_cell({ c: sheetCol, r: sheetRow });
-      const cell = ws[addr];
-      let val = cell ? (cell.v !== undefined ? cell.v : '') : '';
-      if (val instanceof Date) val = val.toLocaleDateString('ru-RU');
-      const st = xcalGetCellStyle(ws, sheetCol, sheetRow);
-      // Если у ячейки нет своего фона из Excel — берём цвет строки по дню недели
-      const hasBg = st.includes('background:');
-      const finalSt = hasBg ? st : (weekdayRowStyle + st);
-      const tdDefault = finalSt.includes('color:') ? '' : 'color:var(--text);';
-      tableHtml += `<td style="${tdDefault}${finalSt}" title="${String(val).replace(/"/g,'&quot;')}">${val !== '' ? val : '&nbsp;'}</td>`;
-    });
-    tableHtml += '</tr>';
-  }
-  tableHtml += '</tbody></table></div>';
-  container.innerHTML = tabsHtml + tableHtml;
-}
-
-
-async function xcalDelete() {
-  if (!confirm('Удалить файл календаря?')) return;
-  try {
-    const storageHeaders = {
-      'apikey': SUPA_KEY,
-      'Authorization': 'Bearer ' + SUPA_KEY
-    };
-    const r = await fetch(
-      SUPA_URL + '/storage/v1/object/' + XCAL_BUCKET + '/' + XCAL_FILE_PATH,
-      { method: 'DELETE', headers: storageHeaders }
-    );
-    if (!r.ok) {
-      const err = await r.text();
-      throw new Error('Статус ' + r.status + ': ' + err);
-    }
-    window._xcalWorkbook = null;
-    renderXCalModal();
-  } catch(e) {
-    alert('Ошибка удаления: ' + e.message);
-  }
-}
-
-function xcalDownload() {
-  const url = SUPA_URL + '/storage/v1/object/public/' + XCAL_BUCKET + '/' + XCAL_FILE_PATH;
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'Kalender.xlsx';
-  a.click();
-}
-
-async function renderXCalModal() {
-  const body = document.getElementById('xcal-body');
-  body.innerHTML = '<div style="text-align:center;color:var(--muted);padding:1rem">⏳ Проверяю...</div>';
-  
-  const info = await xcalGetFileInfo();
-  
-  if (info) {
-    const size = info.size ? (info.size / 1024).toFixed(1) + ' КБ' : '';
-    const updated = info.updated_at ? new Date(info.updated_at).toLocaleString('ru-RU') : '';
-    body.innerHTML = `
-      <div class="xcal-file-card">
-        <span style="font-size:32px">📊</span>
-        <div class="xcal-file-info">
-          <div class="xcal-file-name">Kalender.xlsx</div>
-          <div class="xcal-file-meta">${size}${updated ? ' · обновлён ' + updated : ''}</div>
-        </div>
-      </div>
-      <div class="xcal-actions" style="margin-bottom:1rem">
-        <button class="btn btn-primary" onclick="xcalPreview()" style="font-size:13px;padding:7px 16px">👁️ Просмотр таблицы</button>
-        <button class="btn" onclick="xcalDownload()" style="font-size:13px;padding:7px 16px">⬇️ Скачать</button>
-        <button class="btn" onclick="document.getElementById('xcal-file-input').click()" style="font-size:13px;padding:7px 16px">🔄 Заменить файл</button>
-        <button class="btn" onclick="xcalDelete()" style="font-size:13px;padding:7px 16px;color:var(--red-t);border-color:var(--red-b)">🗑️ Удалить</button>
-      </div>
-      <input type="file" id="xcal-file-input" accept=".xlsx,.xls" style="display:none" onchange="if(this.files[0]) xcalUpload(this.files[0]); this.value='';">
-      <div id="xcal-preview-area" style="display:none" class="xcal-preview"></div>
-      <div class="xcal-hint">Файл хранится в облаке и доступен на всех устройствах</div>`;
-  } else {
-    body.innerHTML = `
-      <div style="text-align:center;padding:1.5rem 0;color:var(--muted);font-size:14px;margin-bottom:1rem">
-        📂 Файл календаря ещё не загружен
-      </div>
-      <div class="xcal-upload-zone" id="xcal-upload-zone" onclick="document.getElementById('xcal-file-input').click()">
-        📊 Нажмите чтобы загрузить Excel файл (.xlsx)
-      </div>
-      <input type="file" id="xcal-file-input" accept=".xlsx,.xls" style="display:none" onchange="if(this.files[0]) xcalUpload(this.files[0]); this.value='';">
-      <div class="xcal-hint">После загрузки файл будет доступен на всех ваших устройствах</div>`;
-  }
-}
-
-function openXCalModal() {
-  document.getElementById('xcal-ov').classList.add('show');
-  renderXCalModal();
-}
-
-function closeXCalModal() {
-  document.getElementById('xcal-ov').classList.remove('show');
-}
-
 </script>
 
 <!-- Calendar Modal -->
@@ -1986,19 +1667,6 @@ function closeXCalModal() {
 
 <div id="lightbox" onclick="closeLightbox()">
   <img id="lightbox-img" src="" alt="">
-</div>
-
-<!-- Excel Calendar Modal -->
-<div id="xcal-ov">
-  <div class="xcal-box">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.2rem">
-      <h2 style="flex:1;margin:0">📊 Моя таблица</h2>
-      <button class="btn" onclick="closeXCalModal()" style="padding:5px 12px;font-size:13px">✕ Закрыть</button>
-    </div>
-    <div id="xcal-body">
-      <div style="text-align:center;color:var(--muted);padding:1rem">⏳ Загрузка...</div>
-    </div>
-  </div>
 </div>
 
 </body>
