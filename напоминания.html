@@ -280,8 +280,8 @@
     </div>
     <button class="btn btn-primary" onclick="addReminder()">+ Добавить напоминание</button>
   </div>
-  <div class="sec-label">Мои напоминания</div>
-  <div class="rlist" id="list"><div class="empty">Напоминаний пока нет</div></div>
+  <div class="sec-label">Сегодня</div>
+  <div class="rlist" id="list"><div class="empty">На сегодня напоминаний нет</div></div>
 </div>
 
 <div id="ov">
@@ -1180,22 +1180,44 @@ function updateCountdowns(){
   });
 }
 
+function getTodayDateStr(){
+  const n=new Date();
+  const pad=x=>String(x).padStart(2,'0');
+  return `${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}`;
+}
+
+function getTodayItems(){
+  const todayStr=getTodayDateStr();
+  const items=[];
+  reminders.forEach(r=>{
+    if(r.date===todayStr){
+      items.push({r,occ:null,eventMs:r.eventMs,isOcc:false});
+    }
+    if(r.completedOccurrences&&r.completedOccurrences.length){
+      r.completedOccurrences.forEach(occ=>{
+        if(occ.date===todayStr){
+          items.push({r,occ,eventMs:occ.eventMs,isOcc:true});
+        }
+      });
+    }
+  });
+  items.sort((a,b)=>a.eventMs-b.eventMs);
+  return items;
+}
+
 function render(){
   const list=document.getElementById('list');
-  if(!reminders.length){list.innerHTML='<div class="empty">Напоминаний пока нет</div>';return;}
-  const now7=Date.now();
-  const todayStart=new Date(); todayStart.setHours(0,0,0,0);
-  const todayEnd=new Date(); todayEnd.setHours(23,59,59,999);
-  const todayStartMs=todayStart.getTime();
-  const todayEndMs=todayEnd.getTime();
-  const visibleReminders=reminders;
-  if(!visibleReminders.length){list.innerHTML='<div class="empty">Напоминаний пока нет</div>';return;}
-  visibleReminders.sort((a,b)=>a.eventMs-b.eventMs);
-  list.innerHTML=visibleReminders.map(r=>{
+  const items=getTodayItems();
+  if(!items.length){list.innerHTML='<div class="empty">На сегодня напоминаний нет</div>';return;}
+  list.innerHTML=items.map(item=>{
+    const r=item.r;
     const m=soundMeta(r.sound);
-    const ringing=currentAlarmId===r.id;
+    const ringing=!item.isOcc&&currentAlarmId===r.id;
     const now2=Date.now();
-    const cdCls=(r.fired||r.eventMs<now2)?'by':r.alertMs-now2<0?'ba':'bb';
+    const displayDate=item.isOcc?item.occ.date:r.date;
+    const displayTime=item.isOcc?item.occ.time:r.time;
+    const isDone=item.isOcc||r.fired||r.eventMs<now2;
+    const cdCls=isDone?'by':r.alertMs-now2<0?'ba':'bb';
     const prioColors={red:'#e24b4a',amber:'#f0a820',green:'#4caf50',none:''};
     const prioStyle=r.priority&&r.priority!=='none'?`color:${prioColors[r.priority]}`:'';
     const T='font-size:14px;font-weight:400;color:var(--text)';
@@ -1203,7 +1225,9 @@ function render(){
     const leftStyle=T+';flex-shrink:0;max-width:55%';
     const rightStyle=T+';display:flex;gap:5px;align-items:center;justify-content:flex-end;flex-wrap:wrap';
     const badgeT='font-size:14px;font-weight:400;padding:3px 10px';
-    return`<div class="ri${ringing?' ringing':''}" id="ri-${r.id}" style="flex-direction:column;align-items:stretch;gap:0">
+    const cdId=item.isOcc?'':` id="cd-${r.id}"`;
+    const cdText=item.isOcc?'✓ Выполнено':'';
+    return`<div class="ri${ringing?' ringing':''}" id="ri-${r.id}${item.isOcc?'-occ-'+item.occ.eventMs:''}" style="flex-direction:column;align-items:stretch;gap:0">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
         <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
           ${r.photo?`<img src="${r.photo}" class="photo-thumb" onclick="event.stopPropagation();openLightbox('${r.photo}')" style="width:36px;height:36px;object-fit:cover;border-radius:50%;border:2px solid var(--border);flex-shrink:0">`:''}
@@ -1216,8 +1240,8 @@ function render(){
       </div>
 
       <div style="${rowStyle}">
-        <span style="${leftStyle}">${fmtDT(r.date,r.time)}</span>
-        <span style="${rightStyle}"><span class="badge ${cdCls} countdown" id="cd-${r.id}" style="${badgeT}"></span></span>
+        <span style="${leftStyle}">${fmtDT(displayDate,displayTime)}</span>
+        <span style="${rightStyle}"><span class="badge ${cdCls} countdown"${cdId} style="${badgeT}">${cdText}</span></span>
       </div>
 
       <div style="${rowStyle}">
