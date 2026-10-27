@@ -1423,7 +1423,43 @@ setInterval(()=>{updateCountdowns();},1000);
 setInterval(()=>{dbLoad();},30000);
 
 // ─── Calendar Modal ───────────────────────────────────────────────────────────
+let calView='list', calDay=null, calItems=[];
+try{ if(localStorage.getItem('calView')==='grid') calView='grid'; }catch(e){}
+function setCalView(v){
+  calView=v; calDay=null;
+  try{ localStorage.setItem('calView',v); }catch(e){}
+  renderCalBody();
+}
+function calSel(){ calDay=null; renderCalResults(); }
+function calSetMonthYear(y,m){
+  const ySel=document.getElementById('cal-year');
+  if(![...ySel.options].some(o=>+o.value===y)) return false;
+  ySel.value=y; document.getElementById('cal-month').value=m; return true;
+}
+function calShiftMonth(n){
+  const m=parseInt(document.getElementById('cal-month').value), y=parseInt(document.getElementById('cal-year').value);
+  const d=new Date(y,m+n,1);
+  if(calSetMonthYear(d.getFullYear(),d.getMonth())){ calDay=null; renderCalResults(); }
+}
+function calToday(){
+  const n=new Date();
+  calSetMonthYear(n.getFullYear(),n.getMonth()); calDay=null; renderCalResults();
+}
+function calOpenDay(ds){ calDay=ds; renderCalBody(); document.getElementById('cal-box').scrollTop=0; }
+function calBackToMonth(){ calDay=null; renderCalBody(); }
+function calGoDay(off){
+  const d=new Date(calDay+'T00:00:00'); d.setDate(d.getDate()+off);
+  const pad=n=>String(n).padStart(2,'0');
+  const ds=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const curM=parseInt(document.getElementById('cal-month').value), curY=parseInt(document.getElementById('cal-year').value);
+  calDay=ds;
+  if(d.getMonth()!==curM||d.getFullYear()!==curY){
+    if(!calSetMonthYear(d.getFullYear(),d.getMonth())){ calDay=null; }
+    renderCalResults();
+  } else renderCalBody();
+}
 function openCalModal(){
+  calDay=null;
   // Populate year list from existing reminders + current year
   const years=new Set();
   const now=new Date();
@@ -1533,30 +1569,24 @@ function renderCalResults(){
     }
   });
   items.sort((a,b)=>a.displayMs-b.displayMs);
-  const filtered=items;
-  const el=document.getElementById('cal-results');
-  if(!filtered.length){
-    el.innerHTML=`<div class="empty">В ${monthNames[month]} ${year} г. нет напоминаний</div>`;
-    return;
-  }
+  calItems=items;
+  renderCalBody();
+}
+
+function calCardHtml(item){
   const now=Date.now();
-  // Цвет текста по приоритету (яркий — для будущих)
   const prioTextColor={red:'#e24b4a',amber:'#d48a00',green:'#4caf50',none:'var(--text)'};
-  // Цвет текста для прошедших — приглушённее (темнее/бледнее)
   const doneTextColor={red:'#8a2f2f',amber:'#7a5000',green:'#2d6b30',none:'var(--muted)'};
-  el.innerHTML=`<div style="font-size:13px;color:var(--muted);margin-bottom:10px">Найдено: <b style="color:var(--text)">${filtered.length}</b></div>`+
-  filtered.map(item=>{
-    const r=item.r;
-    const p=r.priority||'none';
-    const dm=soundMeta(r.sound||'silent');
-    const dayNames=['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
-    const d=new Date(item.displayDate+'T00:00:00');
-    const dayName=dayNames[d.getDay()];
-    // Определяем: это выполненное вхождение (из истории) или текущее прошедшее
-    const isCompleted = item.completed || (r.fired && item.displayMs <= now) || (!item.completed && item.displayMs < now);
-    const displayTime = item.time || r.time;
-    const titleColor = isCompleted ? doneTextColor[p] : prioTextColor[p];
-    return `<div style="background:var(--surface);border:.5px solid var(--border);border-radius:var(--r);padding:1rem 1.1rem;margin-bottom:10px">
+  const r=item.r;
+  const p=r.priority||'none';
+  const dm=soundMeta(r.sound||'silent');
+  const dayNames=['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+  const d=new Date(item.displayDate+'T00:00:00');
+  const dayName=dayNames[d.getDay()];
+  const isCompleted = item.completed || (r.fired && item.displayMs <= now) || (!item.completed && item.displayMs < now);
+  const displayTime = item.time || r.time;
+  const titleColor = isCompleted ? doneTextColor[p] : prioTextColor[p];
+  return `<div style="background:var(--surface);border:.5px solid var(--border);border-radius:var(--r);padding:1rem 1.1rem;margin-bottom:10px">
       <div style="display:flex;align-items:flex-start;gap:10px">
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:10px">
@@ -1577,7 +1607,86 @@ function renderCalResults(){
         </div>
       </div>
     </div>`;
-  }).join('');
+}
+
+function calIsDone(item){
+  const now=Date.now();
+  return item.completed || (item.r.fired && item.displayMs<=now) || item.displayMs<now;
+}
+
+function renderCalBody(){
+  const month=parseInt(document.getElementById('cal-month').value);
+  const year=parseInt(document.getElementById('cal-year').value);
+  const monthNames=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  const monthGen=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+  const dayFull=['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'];
+  const pad=n=>String(n).padStart(2,'0');
+  const el=document.getElementById('cal-results');
+  const isGrid=calView==='grid';
+  document.getElementById('cal-btn-list').classList.toggle('active',!isGrid);
+  document.getElementById('cal-btn-grid').classList.toggle('active',isGrid);
+  document.getElementById('cal-nav').style.display=(isGrid&&!calDay)?'flex':'none';
+  document.getElementById('cal-box').style.maxWidth=(isGrid&&!calDay)?'980px':'520px';
+
+  // ── День ──
+  if(calDay){
+    const d=new Date(calDay+'T00:00:00');
+    const list=calItems.filter(i=>i.displayDate===calDay);
+    el.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <button class="cal-nav" onclick="calBackToMonth()">← ${monthNames[month]}</button>
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="cal-nav" onclick="calGoDay(-1)">‹</button>
+          <button class="cal-nav" onclick="calGoDay(1)">›</button>
+        </div>
+      </div>
+      <div style="font-size:18px;font-weight:700;margin-bottom:4px">${dayFull[d.getDay()]}, ${d.getDate()} ${monthGen[d.getMonth()]} ${d.getFullYear()}</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:12px">Напоминаний: <b style="color:var(--text)">${list.length}</b></div>`+
+      (list.length?list.map(calCardHtml).join(''):`<div class="empty">В этот день нет напоминаний</div>`);
+    return;
+  }
+
+  // ── Календарь месяца ──
+  if(isGrid){
+    const byDate={};
+    calItems.forEach(i=>{(byDate[i.displayDate]=byDate[i.displayDate]||[]).push(i);});
+    const first=new Date(year,month,1);
+    const offset=(first.getDay()+6)%7;
+    const dim=new Date(year,month+1,0).getDate();
+    const total=Math.ceil((offset+dim)/7)*7;
+    const t=new Date();
+    const todayStr=`${t.getFullYear()}-${pad(t.getMonth()+1)}-${pad(t.getDate())}`;
+    const colors={red:'#e24b4a',amber:'#d48a00',green:'#4caf50',none:'#0a84ff'};
+    let h=`<div style="font-size:13px;color:var(--muted);margin-bottom:8px">Найдено: <b style="color:var(--text)">${calItems.length}</b> · нажмите на день, чтобы увидеть детали</div><div class="cal-grid">`;
+    ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].forEach(w=>h+=`<div class="cal-wd">${w}</div>`);
+    for(let c=0;c<total;c++){
+      const dn=c-offset+1;
+      const dt=new Date(year,month,dn);
+      const ds=`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
+      if(dn<1||dn>dim){
+        h+=`<div class="cal-cell other"><div class="cal-num"><span>${dt.getDate()}</span></div></div>`;
+        continue;
+      }
+      const list=(byDate[ds]||[]).slice().sort((a,b)=>a.displayMs-b.displayMs);
+      const max=3;
+      const chips=list.slice(0,max).map(it=>{
+        const col=colors[it.r.priority||'none']||colors.none;
+        const tm=new Date(it.displayMs);
+        return `<div class="cal-chip${calIsDone(it)?' done':''}" style="border-color:${col};background:${col}26;color:${col}" title="${esc(it.r.title)}"><span style="color:var(--text)">${esc(it.r.title)}</span><i>${pad(tm.getHours())}:${pad(tm.getMinutes())}</i></div>`;
+      }).join('');
+      const more=list.length>max?`<div class="cal-more">+ ещё ${list.length-max}</div>`:'';
+      h+=`<div class="cal-cell${ds===todayStr?' today':''}" onclick="calOpenDay('${ds}')"><div class="cal-num"><span>${dn}</span></div><div class="cal-chips">${chips}${more}</div></div>`;
+    }
+    h+='</div>';
+    el.innerHTML=h;
+    return;
+  }
+
+  // ── Список (как раньше) ──
+  if(!calItems.length){
+    el.innerHTML=`<div class="empty">В ${monthNames[month]} ${year} г. нет напоминаний</div>`;
+    return;
+  }
+  el.innerHTML=`<div style="font-size:13px;color:var(--muted);margin-bottom:10px">Найдено: <b style="color:var(--text)">${calItems.length}</b></div>`+calItems.map(calCardHtml).join('');
 }
 document.getElementById('cal-ov').addEventListener('click',function(e){
   if(e.target===this) closeCalModal();
@@ -1662,15 +1771,52 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape') closeLightb
 
 <!-- Calendar Modal -->
 <div id="cal-ov" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1100;align-items:center;justify-content:center;padding:1rem">
-  <div style="background:var(--surface);border-radius:var(--r);padding:1.5rem;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;border:.5px solid var(--border)">
+  <div id="cal-box" style="background:var(--surface);border-radius:var(--r);padding:1.5rem;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;border:.5px solid var(--border);transition:max-width .2s">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.2rem;flex-wrap:wrap">
       <h2 style="font-size:17px;font-weight:600;flex:1">📅 Напоминания по месяцу</h2>
       <button class="btn" onclick="closeCalModal()" style="padding:5px 12px;font-size:13px">✕ Закрыть</button>
     </div>
+    <style>
+  .cal-tg{font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;padding:6px 14px;border:.5px solid var(--border);background:var(--bg);color:var(--text)}
+  .cal-tg.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .cal-nav{font-family:inherit;font-size:14px;cursor:pointer;padding:5px 12px;border-radius:var(--rs);border:.5px solid var(--border);background:var(--bg);color:var(--text)}
+  .cal-nav:hover{border-color:var(--border-h)}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:.5px solid var(--border);border-left:.5px solid var(--border)}
+  .cal-wd{padding:6px 4px;text-align:center;font-size:12px;font-weight:600;color:var(--muted);border-right:.5px solid var(--border);border-bottom:.5px solid var(--border)}
+  .cal-cell{min-height:104px;padding:4px;border-right:.5px solid var(--border);border-bottom:.5px solid var(--border);cursor:pointer;overflow:hidden;transition:background .12s}
+  .cal-cell:hover{background:rgba(127,127,127,.12)}
+  .cal-cell.other{cursor:default;opacity:.35}
+  .cal-cell.other:hover{background:none}
+  .cal-num{font-size:13px;font-weight:600;text-align:right;padding:1px 3px;margin-bottom:3px}
+  .cal-num span{display:inline-block;min-width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%}
+  .cal-cell.today .cal-num span{background:#ff3b30;color:#fff}
+  .cal-chip{font-size:11px;line-height:1.25;padding:2px 4px;margin-bottom:2px;border-radius:4px;border-left:3px solid;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+  .cal-chip.done{opacity:.5}
+  .cal-chip i{font-style:normal;color:var(--muted);margin-left:4px;font-size:10px}
+  .cal-more{font-size:11px;color:var(--muted);padding:0 4px}
+  @media(max-width:640px){
+    .cal-cell{min-height:58px;padding:2px}
+    .cal-chip{font-size:0;padding:0;height:6px;width:6px;border-radius:50%;border-left-width:0;display:inline-block;margin:1px;background:currentColor}
+    .cal-chip i{display:none}
+    .cal-chips{text-align:center;line-height:1}
+    .cal-more{display:none}
+  }
+</style>
+<div style="display:flex;gap:10px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+  <div style="display:flex">
+    <button id="cal-btn-list" class="cal-tg" onclick="setCalView('list')" style="border-radius:var(--rs) 0 0 var(--rs)">☰ Список</button>
+    <button id="cal-btn-grid" class="cal-tg" onclick="setCalView('grid')" style="border-radius:0 var(--rs) var(--rs) 0;border-left:none">📅 Календарь</button>
+  </div>
+  <div id="cal-nav" style="display:none;margin-left:auto;gap:6px">
+    <button class="cal-nav" onclick="calShiftMonth(-1)">‹</button>
+    <button class="cal-nav" onclick="calToday()">Сегодня</button>
+    <button class="cal-nav" onclick="calShiftMonth(1)">›</button>
+  </div>
+</div>
     <div style="display:flex;gap:10px;margin-bottom:1rem;flex-wrap:wrap">
       <div class="field" style="flex:1;min-width:120px">
         <label style="font-size:13px;color:var(--muted);font-weight:500;display:block;margin-bottom:4px">Месяц</label>
-        <select id="cal-month" onchange="renderCalResults()" style="font-family:inherit;font-size:14px;background:var(--bg);color:var(--text);border:.5px solid var(--border);border-radius:var(--rs);padding:8px 10px;width:100%">
+        <select id="cal-month" onchange="calSel()" style="font-family:inherit;font-size:14px;background:var(--bg);color:var(--text);border:.5px solid var(--border);border-radius:var(--rs);padding:8px 10px;width:100%">
           <option value="0">Январь</option><option value="1">Февраль</option>
           <option value="2">Март</option><option value="3">Апрель</option>
           <option value="4">Май</option><option value="5">Июнь</option>
@@ -1681,7 +1827,7 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape') closeLightb
       </div>
       <div class="field" style="flex:1;min-width:100px">
         <label style="font-size:13px;color:var(--muted);font-weight:500;display:block;margin-bottom:4px">Год</label>
-        <select id="cal-year" onchange="renderCalResults()" style="font-family:inherit;font-size:14px;background:var(--bg);color:var(--text);border:.5px solid var(--border);border-radius:var(--rs);padding:8px 10px;width:100%">
+        <select id="cal-year" onchange="calSel()" style="font-family:inherit;font-size:14px;background:var(--bg);color:var(--text);border:.5px solid var(--border);border-radius:var(--rs);padding:8px 10px;width:100%">
         </select>
       </div>
     </div>
