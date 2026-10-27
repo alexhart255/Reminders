@@ -1445,6 +1445,32 @@ function calToday(){
   const n=new Date();
   calSetMonthYear(n.getFullYear(),n.getMonth()); calDay=null; renderCalResults();
 }
+let calLongTimer=null, calLastLong=0;
+function calAddOnDay(ds){
+  calLastLong=Date.now();
+  closeCalModal();
+  const pad=n=>String(n).padStart(2,'0');
+  document.getElementById('inp-date').value=ds;
+  // Время по умолчанию: 09:00, а для сегодняшнего дня — ближайший полный час
+  const now=new Date();
+  const todayStr=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  let hh=9;
+  if(ds===todayStr && now.getHours()>=9) hh=Math.min(now.getHours()+1,23);
+  document.getElementById('inp-time-h').value=pad(hh);
+  document.getElementById('inp-time-m').value='00';
+  window.scrollTo({top:0,behavior:'smooth'});
+  const t=document.getElementById('inp-title');
+  if(t) setTimeout(()=>t.focus(),300);
+}
+function calPressStart(ds){
+  calPressCancel();
+  calLongTimer=setTimeout(()=>{calLongTimer=null;calAddOnDay(ds);},550);
+}
+function calPressCancel(){ if(calLongTimer){clearTimeout(calLongTimer);calLongTimer=null;} }
+function calCellClick(ds){
+  if(Date.now()-calLastLong<800) return; // долгое нажатие уже сработало
+  calOpenDay(ds);
+}
 function calOpenDay(ds){ calDay=ds; renderCalBody(); document.getElementById('cal-box').scrollTop=0; }
 function calBackToMonth(){ calDay=null; renderCalBody(); }
 function calGoDay(off){
@@ -1635,6 +1661,7 @@ function renderCalBody(){
     el.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
         <button class="cal-nav" onclick="calBackToMonth()">← ${monthNames[month]}</button>
         <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="cal-nav" onclick="calAddOnDay('${calDay}')" style="background:var(--accent);border-color:var(--accent);color:#fff">＋ Добавить</button>
           <button class="cal-nav" onclick="calGoDay(-1)">‹</button>
           <button class="cal-nav" onclick="calGoDay(1)">›</button>
         </div>
@@ -1656,7 +1683,7 @@ function renderCalBody(){
     const t=new Date();
     const todayStr=`${t.getFullYear()}-${pad(t.getMonth()+1)}-${pad(t.getDate())}`;
     const colors={red:'#e24b4a',amber:'#d48a00',green:'#4caf50',none:'#0a84ff'};
-    let h=`<div style="font-size:13px;color:var(--muted);margin-bottom:8px">Найдено: <b style="color:var(--text)">${calItems.length}</b> · нажмите на день, чтобы увидеть детали</div><div class="cal-grid">`;
+    let h=`<div style="font-size:13px;color:var(--muted);margin-bottom:8px">Найдено: <b style="color:var(--text)">${calItems.length}</b> · нажмите на день, чтобы открыть его; удерживайте день, чтобы добавить напоминание</div><div class="cal-grid">`;
     ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].forEach(w=>h+=`<div class="cal-wd">${w}</div>`);
     for(let c=0;c<total;c++){
       const dn=c-offset+1;
@@ -1674,7 +1701,7 @@ function renderCalBody(){
         return `<div class="cal-chip${calIsDone(it)?' done':''}" style="border-color:${col};background:${col}26;color:${col}" title="${esc(it.r.title)}"><span style="color:var(--text)">${esc(it.r.title)}</span><i>${pad(tm.getHours())}:${pad(tm.getMinutes())}</i></div>`;
       }).join('');
       const more=list.length>max?`<div class="cal-more">+ ещё ${list.length-max}</div>`:'';
-      h+=`<div class="cal-cell${ds===todayStr?' today':''}" onclick="calOpenDay('${ds}')"><div class="cal-num"><span>${dn}</span></div><div class="cal-chips">${chips}${more}</div></div>`;
+      h+=`<div class="cal-cell${ds===todayStr?' today':''}" onclick="calCellClick('${ds}')" oncontextmenu="event.preventDefault();if(Date.now()-calLastLong>800)calAddOnDay('${ds}')" onpointerdown="calPressStart('${ds}')" onpointerup="calPressCancel()" onpointerleave="calPressCancel()" onpointercancel="calPressCancel()" title="Нажмите — открыть день, удерживайте или правая кнопка — добавить напоминание"><div class="cal-num"><span>${dn}</span></div><div class="cal-chips">${chips}${more}</div></div>`;
     }
     h+='</div>';
     el.innerHTML=h;
@@ -1783,7 +1810,7 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape') closeLightb
   .cal-nav:hover{border-color:var(--border-h)}
   .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:.5px solid var(--border);border-left:.5px solid var(--border)}
   .cal-wd{padding:6px 4px;text-align:center;font-size:12px;font-weight:600;color:var(--muted);border-right:.5px solid var(--border);border-bottom:.5px solid var(--border)}
-  .cal-cell{min-height:104px;padding:4px;border-right:.5px solid var(--border);border-bottom:.5px solid var(--border);cursor:pointer;overflow:hidden;transition:background .12s}
+  .cal-cell{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;min-height:104px;padding:4px;border-right:.5px solid var(--border);border-bottom:.5px solid var(--border);cursor:pointer;overflow:hidden;transition:background .12s}
   .cal-cell:hover{background:rgba(127,127,127,.12)}
   .cal-cell.other{cursor:default;opacity:.35}
   .cal-cell.other:hover{background:none}
