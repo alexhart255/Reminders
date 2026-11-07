@@ -1244,10 +1244,10 @@ function render(){
         <span style="${rightStyle}"><span class="badge ${cdCls} countdown"${cdId} style="${badgeT}">${cdText}</span></span>
       </div>
 
-      <div style="${rowStyle}">
+      ${r.before?`<div style="${rowStyle}">
         <span style="${leftStyle}"></span>
         <span style="${rightStyle}"><span class="badge bl" style="${badgeT}">напомнить ${blabel(r.before)}</span></span>
-      </div>
+      </div>`:''}
 
       ${r.repeat?`<div style="${rowStyle}">
         <span style="${leftStyle}"></span>
