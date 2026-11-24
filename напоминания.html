@@ -584,9 +584,12 @@ async function idbDelete(id){
 
 // ─── Firestore data layer ─────────────────────────────────────────────────────
 
-async function dbLoad(){
+let _snapActive=false;
+async function dbLoad(snapArg){
+  // Когда активен realtime-листенер, ручные перезагрузки не нужны (они тратят квоту чтения)
+  if(!snapArg && _snapActive) return;
   try{
-    const snap=await remindersCol.orderBy('alert_ms','asc').get();
+    const snap=snapArg||await remindersCol.orderBy('alert_ms','asc').get();
     const rows=snap.docs.map(d=>{ const v=d.data(); v.id=Number(d.id); return v; });
     reminders=rows.map(x=>{
       // Сохраняем локальный fired=true — не даём базе его перезаписать
@@ -1416,11 +1419,16 @@ const pad=n=>String(n).padStart(2,'0');
 document.getElementById('inp-date').value=`${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
 buildSoundSelector();
 render();
-dbLoad();
+startRealtime();
 setInterval(()=>{checkAlarms();render();updateCountdowns();},10000);
 setInterval(()=>{updateCountdowns();},1000);
-// Синхронизация с облаком каждые 30 секунд
-setInterval(()=>{dbLoad();},30000);
+// Синхронизация с облаком в реальном времени: после первой загрузки читаются только изменённые документы
+function startRealtime(){
+  remindersCol.orderBy('alert_ms','asc').onSnapshot(
+    snap=>{ _snapActive=true; dbLoad(snap); },
+    e=>{ _snapActive=false; console.warn('Firestore listen error:',e); setTimeout(startRealtime,60000); }
+  );
+}
 
 // ─── Calendar Modal ───────────────────────────────────────────────────────────
 let calView='list', calDay=null, calItems=[];
